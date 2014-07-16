@@ -3,4 +3,5 @@ deps
 *.o
 *.beam
 *.plt
+*.app
 erl_crash.dump

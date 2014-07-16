@@ -1,4 +1,9 @@
-cloudi_service_flmqtt
-=====================
+### Fluksometer MQTT endpoint running as a cloudi service.
 
-Fluksometer MQTT endpoint in Cloudi
+To run the flmqtt service under cloudi:
+
+    $ make start
+
+List other make targets with:
+
+    $ make help

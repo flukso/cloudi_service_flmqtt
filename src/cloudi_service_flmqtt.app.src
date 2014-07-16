@@ -1,0 +1,18 @@
+{application, cloudi_service_flmqtt,
+  [{description, "fluksometer mqtt endpoint"},
+   {vsn, "0.1.0"},
+   {modules, [
+        mqtt_protocol,
+        cloudi_service_flmqtt
+        ]},
+   {registered, []},
+   {applications, [
+        cloudi_core,
+        cloudi_x_cowboy,
+        cloudi_x_ranch,
+        cloudi_x_trie,
+        cloudi_x_uuid,
+        stdlib,
+        kernel
+        ]}]}.
+
