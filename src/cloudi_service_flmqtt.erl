@@ -20,10 +20,14 @@ cloudi_service_init(_Args, Prefix, Dispatcher) ->
     {ok, ListenerPid} = cloudi_x_ranch:start_listener(
         Service, % Ref
         100, % Number of acceptor processes
-        cloudi_x_ranch_tcp, % Transport
-        [{port, 1883}, % TransOpts
+        cloudi_x_ranch_ssl, % Transport
+        [{port, 8883}, % TransOpts
+         {cacertfile, "/etc/ssl/certs/flukso.ca.crt"},
+         {certfile, "/etc/ssl/certs/staging.flukso.net.crt"},
+         {keyfile, "/etc/ssl/private/staging.flukso.net.key"},
+         {verify, verify_none},
          {max_connections, unlimited}],
-        flmqtt_protocol, % Protocol
+        mqtt_protocol, % Protocol
         [{dispatcher, cloudi_service:dispatcher(Dispatcher)}, % ProtoOpts
          {context, create_context(Dispatcher)}, % cf cloudi_service_children.hrl
          {prefix, Prefix}]

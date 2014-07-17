@@ -1,38 +1,30 @@
 %%% -------------------------------------------------------------------
-%%% Author  : Sungjin Park <jinni.park@gmail.com>
+%%% Author : Sungjin Park <jinni.park@gmail.com>
+%%%          Bart Van Der Meerssche <bart@flukso.net>
 %%%
 %%% Description : MQTT protocol parser.
-%%%   mqtt_protocol is designed to run under ranch as server or
-%%% independently as client also.  In server mode, ranch_conns_sup
-%%% calls mqtt_protocol:start_link/4 callback.  For client mode,
-%%% mqtt_protocol:start/1 is provided.  Either way, it runs as a
-%%% gen_server.
-%%%   It receives tcp data from a socket and parses to make mqtt
-%%% messages and hand them over to a dispatcher behind.  A dispatcher
-%%% must implement mqtt_protocol callback behavior.
+%%%     mqtt_protocol is implemented as a ranch protocol handler.
+%%% ranch_conns_sup calls the mqtt_protocol:start_link/4 callback.
+%%% This gen_server receives tcp data from a socket and parses to
+%%% distill mqtt messages and hand them over to a dispatcher. The
+%%% dispatcher must implement mqtt_protocol callback behavior.
 %%%
 %%% Created : Nov 14, 2012
-%%% Refactored : Jan 16, 2014
+%%% Trimmed : Jul 16, 2014
 %%% -------------------------------------------------------------------
 -module(mqtt_protocol).
 -author("Sungjin Park <jinni.park@gmail.com>").
 -behavior(gen_server).
--behavior(ranch_protocol).
-
-%%
-%% Exports
-%%
--export([start/1, stop/1, setopts/2]).
+%-behavior(ranch_protocol).
 
 %%
 %% Callbacks
 %%
--export([start_link/4, server_init/1]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([start_link/4, init/1]).
+-export([handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--include("fubar.hrl").
 -include("mqtt.hrl").
--include("props_to_record.hrl").
+-include_lib("cloudi_core/include/cloudi_logger.hrl").
 
 %%
 %% mqtt_protocol behavior callback definition
@@ -61,93 +53,44 @@
 -define(STATE, ?MODULE).
 
 -record(?STATE, {
-		host = "localhost" :: string(),			% for client mode
-		port = 1883 :: ipport(),				% for client mode
-		listener :: undefined | socket(),		% for server mode
-		transport = ranch_tcp :: module(),
-		socket :: socket(),
-		socket_options = [] :: params(),
-		acl_socket_options = [] :: params(),
-		max_packet_size = 4096 :: pos_integer(),
-		dispatch = mqtt_server :: module(),
-		context = [] :: term(),
-		header,
-		buffer = <<>> :: binary(),
-		timeout = 10000 :: timeout()
+	listener :: undefined | socket(),
+	transport = cloudi_x_ranch_ssl :: module(),
+	socket :: socket(),
+	socket_options = [] :: params(),
+	acl_socket_options = [] :: params(),
+	max_packet_size = 4194304 :: pos_integer(),
+	dispatch = cloudi_service_flmqtt_dispatch :: module(),
+	context = [] :: term(),
+	header,
+	buffer = <<>> :: binary(),
+	timeout = 10000 :: timeout()
 }).
-
-%% @doc Start mqtt_protocol in standalone gen_server.
-%% Settings should be given as a parameter -- the application setting doesn't apply.
--spec start(params()) -> {ok, pid()} | {error, Reason :: term()}.
-start(Params) ->
-	State = ?PROPS_TO_RECORD(Params, ?STATE),
-	gen_server:start(?MODULE, State#?STATE{context=Params}, []).
-
-%% @doc Stop mqtt_protocol.
--spec stop(pid()) -> ok.
-stop(Pid) ->
-	gen_server:cast(Pid, stop).
-
-%% @doc Set socket options.
--spec setopts(pid(), params()) -> ok.
-setopts(Pid, Options) ->
-	gen_server:cast(Pid, {setopts, Options}).
-
-
-%% Standalone mode gen_server callback.
-init(State) ->
-	% Timeout immediately to trigger actual init asynchronously.
-	{ok, State, 0}.
-
-%% Actually called by async init, handle_info(timeout, _)
-client_init(State=#?STATE{transport=T, socket=S, socket_options=O,
-					dispatch=D, context=C}) ->
-	T:setopts(S, O),
-	case D:init(C) of
-		{reply, Reply, Context, Timeout} ->
-			case catch T:send(S, format(Reply)) of
-				ok ->
-					T:setopts(S, [{active, once}]),
-					{noreply, State#?STATE{context=Context, timeout=Timeout}, Timeout};
-				Error ->
-					lager:warning("socket error ~p", [Error]),
-					D:terminate(Error, Context),
-					exit(Error)
-			end;
-		{noreply, Context, Timeout} ->
-			T:setopts(S, [{active, once}]),
-			{noreply, State#?STATE{context=Context, timeout=Timeout}, Timeout};
-		{stop, Reason} ->
-			{stop, Reason}
-	end.
 
 %% ranch_conns_sup calls this callback function
 start_link(L, S, T, O) ->
-	% Apply settings from the application metadata.
-	Settings = fubar:settings(?MODULE),
-	State = ?PROPS_TO_RECORD(Settings++O, ?STATE),
-	proc_lib:start_link(?MODULE, server_init,
-				[State#?STATE{listener=L, socket=S, transport=T}]).
+	%State = ?PROPS_TO_RECORD(Settings++O, ?STATE),
+	proc_lib:start_link(?MODULE, init,
+				[#?STATE{listener=L, socket=S, transport=T}]).
 
-server_init(State=#?STATE{listener=L, transport=T, socket=S, socket_options=O}) ->
+init(State=#?STATE{listener=L, transport=T, socket=S, socket_options=O}) ->
 	% proc_lib sync requirement for start_link
 	ok = proc_lib:init_ack({ok, self()}),
 	% ranch sync requirement for socket ownership
 	% Must be called before doing anything with the socket
-	ok = ranch:accept_ack(L),
+	ok = cloudi_x_ranch:accept_ack(L),
 	% Leave connection log
 	Addr = case T:peername(S) of
 			   {ok, {PeerAddr, PeerPort}} ->
-				   lager:info("connection established from ~p:~p", [PeerAddr, PeerPort]),
+				   ?LOG_INFO("connection established from ~p:~p", [PeerAddr, PeerPort]),
 				   PeerAddr;
 			   {error, Reason} ->
-				   lager:warning("failed getting peername with ~p", [Reason]),
+				   ?LOG_WARN("failed getting peername with ~p", [Reason]),
 				   undefined
 		   end,
 	% SSL handshake if necessary
 	case S of
 		{sslsocket, _, _} ->
-			lager:debug("ssl info ~p", [ssl:connection_info(S)]),
+			?LOG_DEBUG("ssl info ~p", [ssl:connection_info(S)]),
 			% Remove options for ssl only
 			O1 = lists:foldl(	fun(Key, Acc) ->
 									proplists:delete(Key, Acc)
@@ -155,85 +98,75 @@ server_init(State=#?STATE{listener=L, transport=T, socket=S, socket_options=O}) 
 			State1 = State#?MODULE{socket_options=O1},
 			case ssl:peercert(S) of
 				{ok, _} ->
-					server_init(State1, {check_addr, Addr});
+					init(State1, {check_addr, Addr});
 				Error ->
 					case proplists:get_value(verify, O) of
 						verify_peer ->
 							% The client is not certified and rejected.
-							lager:warning("ssl cert rejected by ~p", [Error]),
+							?LOG_WARN("ssl cert rejected by ~p", [Error]),
 							exit(normal);
 						_ ->
 							% The client is not certified but accepted.
-							server_init(State1, {check_addr, Addr})
+							init(State1, {check_addr, Addr})
 					end
 			end;
 		_ ->
-			server_init(State, {check_addr, Addr})
+			init(State, {check_addr, Addr})
 	end.
 
-server_init(State=#?STATE{acl_socket_options=O}, {check_addr, Addr}) ->
-	case mqtt_acl:verify(Addr) of
-		ok ->
-			lager:info("acl pass from ~p", [Addr]),
-			% Change socket options for privileged and bypass auth.
-			server_init(State#?STATE{socket_options=O, context=[{auth, undefined}]}, ok);
-		{error, not_found} ->
-			server_init(State, ok);
-		{error, forbidden} ->
-			lager:info("acl block from ~p", [Addr]),
-			exit(normal)
-	end;
-server_init(State=#?STATE{transport=T, socket=S, socket_options=O,
+init(State=#?STATE{acl_socket_options=O}, {check_addr, Addr}) ->
+	?LOG_INFO("acl pass from ~p", [Addr]),
+	init(State#?STATE{socket_options=O, context=[{auth, undefined}]}, ok);
+
+init(State=#?STATE{transport=T, socket=S, socket_options=O,
 					dispatch=D, context=C}, ok) ->
 	ok = T:setopts(S, O),
 	case D:init(C) of
 		{reply, Reply, Context, Timeout} ->
 			% If there is a server initiated message
 			Data = format(Reply),
-			lager:debug("STREAM OUT ~p", [Data]),
+			?LOG_DEBUG("STREAM OUT ~p", [Data]),
 			case catch T:send(S, Data) of
 				ok ->
 					process_flag(trap_exit, true),
-					mqtt_stat:join(connections),
 					T:setopts(S, [{active, once}]),
 					gen_server:enter_loop(?MODULE, [], State#?STATE{context=Context, timeout=Timeout}, Timeout);
 				{error, Reason} ->
-					lager:warning("socket error ~p", [Reason]),
+					?LOG_WARN("socket error ~p", [Reason]),
 					D:terminate(Reason, Context),
 					exit(normal);
 				Exit ->
-					lager:warning("socket exception ~p", [Exit]),
+					?LOG_WARN("socket exception ~p", [Exit]),
 					D:terminate(Exit, Context),
 					exit(normal)
 			end;
 		{noreply, Context, Timeout} ->
 			process_flag(trap_exit, true),
-			mqtt_stat:join(connections),
 			T:setopts(S, [{active, once}]),
 			gen_server:enter_loop(?MODULE, [], State#?STATE{context=Context, timeout=Timeout}, Timeout);
 		{stop, Reason} ->
-			lager:debug("dispatch init failure ~p", [Reason]),
+			?LOG_DEBUG("dispatch init failure ~p", [Reason]),
 			exit(normal)
 	end.
 
 %% Fallback
 handle_call(M, F, State=#?STATE{timeout=T}) ->
-	lager:warning("unknown call ~p from ~p", [M, F]),
+	?LOG_WARN("unknown call ~p from ~p", [M, F]),
 	{reply, {error, unknown}, State, T}.
 
 %% Async administrative commands.
 handle_cast({send, M}, State=#?STATE{transport=T, socket=S,
 								dispatch=D, context=C, timeout=T}) ->
 	Data = format(M),
-	lager:debug("STREAM OUT: ~p", [Data]),
+	?LOG_DEBUG("STREAM OUT: ~p", [Data]),
 	case catch T:send(S, Data) of
 		ok ->
 			{noreply, State, T};
 		{error, Reason} ->
-			lager:warning("socket error ~p", [Reason]),
+			?LOG_WARN("socket error ~p", [Reason]),
 			{stop, D:terminate(M, C), State};
 		Exit ->
-			lager:warning("socket exception ~p", [Exit]),
+			?LOG_WARN("socket exception ~p", [Exit]),
 			{stop, D:terminate(M, C), State}
 	end;
 handle_cast(stop, State=#?STATE{dispatch=D, context=C}) ->
@@ -241,51 +174,23 @@ handle_cast(stop, State=#?STATE{dispatch=D, context=C}) ->
 
 %% Fallback
 handle_cast(M, State=#?STATE{timeout=T}) ->
-	lager:warning("unknown cast ~p", [M]),
+	?LOG_WARN("unknown cast ~p", [M]),
 	{noreply, State, T}.
 
 %% Apply socket options.
 handle_info({setopts, O}, State=#?STATE{transport=T, socket=S, timeout=T}) ->
-	lager:debug("setopts ~p", [O]),
+	?LOG_DEBUG("setopts ~p", [O]),
 	T:setopts(S, [{active, once} | O]),
 	{noreply, State, T};
-
-%% Standalone mode async init from init/1
-handle_info(timeout, State=#?STATE{transport=T, socket=undefined, socket_options=O}) ->
-	case catch T:connect(State#?STATE.host, State#?STATE.port, O) of
-		{ok, Socket} ->
-			{ok, {Addr, Port}} = T:peername(Socket),
-			lager:info("connection established to ~p:~p", [Addr, Port]),
-			case Socket of
-				{sslsocket, _, _} ->
-					lager:debug("ssl info: ~p", [ssl:connection_info(Socket)]),
-					case ssl:peercert(Socket) of
-						{ok, _} ->
-							client_init(State#?STATE{
-											socket=Socket,
-											socket_options=lists:foldl(	fun(Key, Acc) ->
-																			proplists:delete(Key, Acc)
-																		end, O, ssl_options())
-										});
-						Error ->
-							{stop, Error}
-					end;
-				_ ->
-					client_init(State#?STATE{socket=Socket})
-			end;
-		Error1 ->
-			{stop, Error1}
-	end;
 
 %% Received tcp data, start parsing.
 handle_info({ssl, S, P}, State=#?STATE{socket=S}) ->
 	handle_info({tcp, S, P}, State);
 handle_info({tcp, S, P}, State=#?STATE{transport=T, socket=S, buffer=B,
 								dispatch=D, context=C}) ->
-	erlang:garbage_collect(),
 	case P of
 		<<>> -> ok; % empty packet
-		_ -> lager:debug("STREAM IN ~p", [P])
+		_ -> ?LOG_DEBUG("STREAM IN ~p", [P])
 	end,
 	% Append the packet at the end of the buffer and start parsing.
 	case parse(State#?STATE{buffer= <<B/binary, P/binary>>}) of
@@ -295,24 +200,24 @@ handle_info({tcp, S, P}, State=#?STATE{transport=T, socket=S, buffer=B,
 			case D:handle_message(Message, C) of
 				{reply, Reply, Context, Timeout} ->
 					P1 = format(Reply),
-					lager:debug("STREAM OUT ~p", [P1]),
+					?LOG_DEBUG("STREAM OUT ~p", [P1]),
 					case catch T:send(S, P1) of
 						ok ->
 							% Simulate new tcp data to trigger next parsing schedule.
 							self() ! {tcp, S, <<>>},
 							{noreply, State1#?STATE{context=Context, timeout=Timeout}, Timeout};
 						{error, Reason} ->
-							lager:warning("socket error ~p", [Reason]),
+							?LOG_WARN("socket error ~p", [Reason]),
 							{stop, D:terminate(Reply, Context), State1#?STATE{context=Context}};
 						Exit ->
-							lager:warning("socket exception ~p", [Exit]),
+							?LOG_WARN("socket exception ~p", [Exit]),
 							{stop, D:terminate(Reply, Context), State1#?STATE{context=Context}}
 					end;
 				{noreply, Context, Timeout} ->
 					self() ! {tcp, S, <<>>},
 					{noreply, State1#?STATE{context=Context, timeout=Timeout}, Timeout};
 				{stop, Reason, Context} ->
-					lager:debug("dispatch issued stop ~p", [Reason]),
+					?LOG_DEBUG("dispatch issued stop ~p", [Reason]),
 					{stop, D:terminate(Reason, Context), State1#?STATE{context=Context}}
 			end;
 		{more, State1} ->
@@ -320,7 +225,7 @@ handle_info({tcp, S, P}, State=#?STATE{transport=T, socket=S, buffer=B,
 			T:setopts(S, [{active, once}]),
 			{noreply, State1, State#?STATE.timeout};
 		{error, Reason, State1} ->
-			lager:warning("parse error ~p", [Reason]),
+			?LOG_WARN("parse error ~p", [Reason]),
 			{stop, D:terminate(normal, C), State1}
 	end;
 
@@ -333,15 +238,15 @@ handle_info({tcp_closed, S}, State=#?STATE{transport=T, socket=S, dispatch=D, co
 
 %% Socket error detected.
 handle_info({ssl_error, S, R}, State=#?STATE{socket=S, dispatch=D, context=C}) ->
-	lager:warning("ssl error ~p", [R]),
+	?LOG_WARN("ssl error ~p", [R]),
 	{stop, D:terminate(normal, C), State};
 handle_info({tcp_error, S, R}, State=#?STATE{socket=S, dispatch=D, context=C}) ->
-	lager:warning("tcp error ~p", [R]),
+	?LOG_WARN("tcp error ~p", [R]),
 	{stop, D:terminate(normal, C), State};
 
 %% Trap exit
 handle_info({'EXIT', F, R}, State=#?STATE{dispatch=D, context=C}) ->
-	lager:warning("trap exit ~p from ~p", [R, F]),
+	?LOG_WARN("trap exit ~p from ~p", [R, F]),
 	{stop, D:terminate(normal, C), State};
 
 %% Invoke dispatcher to handle all the other events.
@@ -349,40 +254,36 @@ handle_info(M, State=#?STATE{transport=T, socket=S, dispatch=D, context=C}) ->
 	case D:handle_event(M, C) of
 		{reply, Reply, Context, Timeout} ->
 			Data = format(Reply),
-			lager:debug("STREAM OUT ~p", [Data]),
+			?LOG_DEBUG("STREAM OUT ~p", [Data]),
 			case catch T:send(S, Data) of
 				ok ->
 					{noreply, State#?STATE{context=Context, timeout=Timeout}, Timeout};
 				{error, Reason} ->
-					lager:warning("~p:send/1 error ~p", [T, Reason]),
+					?LOG_WARN("~p:send/1 error ~p", [T, Reason]),
 					{stop, D:terminate(Reply, Context), State#?STATE{context=Context}};
 				Exit ->
-					lager:warning("~p:send/1 exception ~p", [T, Exit]),
+					?LOG_WARN("~p:send/1 exception ~p", [T, Exit]),
 					{stop, D:terminate(Reply, Context), State#?STATE{context=Context}}
 			end;
 		{noreply, Context, Timeout} ->
 			{noreply, State#?STATE{context=Context, timeout=Timeout}, Timeout};
 		{stop, Reason, Context} ->
-			lager:debug("dispatch issued stop ~p", [Reason]),
+			?LOG_DEBUG("dispatch issued stop ~p", [Reason]),
 			{stop, D:terminate(normal, Context), State#?STATE{context=Context}}
 	end.
 
 %% Termination logic.
 terminate(R, State=#?STATE{transport=T}) ->
-	case State#?STATE.listener of
-		undefined -> ok;
-		_ ->  mqtt_stat:leave(connections)
-	end,
 	case State#?STATE.socket of
 		undefined ->
-			lager:info("~p closed by ~p", [T, R]);
+			?LOG_INFO("~p closed by ~p", [T, R]);
 		Socket ->
-			lager:info("closing ~p by ~p", [T, R]),
+			?LOG_INFO("closing ~p by ~p", [T, R]),
 			T:close(Socket)
 	end.
 
 code_change(V, State, Ex) ->
-	lager:debug("code change from ~p while ~p, ~p", [V, State, Ex]),
+	?LOG_DEBUG("code change from ~p while ~p, ~p", [V, State, Ex]),
 	{ok, State}.
 
 %%

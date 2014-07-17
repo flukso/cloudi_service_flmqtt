@@ -1,4 +1,4 @@
-### Fluksometer MQTT endpoint running as a cloudi service.
+### A Fluksometer MQTT endpoint running as a cloudi service.
 
 To run the flmqtt service under cloudi:
 

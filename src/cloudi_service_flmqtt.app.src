@@ -2,8 +2,11 @@
   [{description, "fluksometer mqtt endpoint"},
    {vsn, "0.1.0"},
    {modules, [
+        cloudi_service_flmqtt,
+        cloudi_service_flmqtt_dispatch,
+        cloudi_service_flmqtt_auth,
         mqtt_protocol,
-        cloudi_service_flmqtt
+        mqtt
         ]},
    {registered, []},
    {applications, [
@@ -12,6 +15,9 @@
         cloudi_x_ranch,
         cloudi_x_trie,
         cloudi_x_uuid,
+        crypto,
+        public_key,
+        ssl,
         stdlib,
         kernel
         ]}]}.
