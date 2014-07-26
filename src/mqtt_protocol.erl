@@ -50,9 +50,7 @@
 %%
 %% gen_server state
 %%
--define(STATE, ?MODULE).
-
--record(?STATE, {
+-record(state, {
 	listener :: undefined | socket(),
 	transport = cloudi_x_ranch_ssl :: module(),
 	socket :: socket(),
@@ -68,11 +66,11 @@
 
 %% ranch_conns_sup calls this callback function
 start_link(L, S, T, O) ->
-	%State = ?PROPS_TO_RECORD(Settings++O, ?STATE),
+	%State = ?PROPS_TO_RECORD(Settings++O, state),
 	proc_lib:start_link(?MODULE, init,
-				[#?STATE{listener=L, socket=S, transport=T}]).
+				[#state{listener=L, socket=S, transport=T}]).
 
-init(State=#?STATE{listener=L, transport=T, socket=S, socket_options=O}) ->
+init(State=#state{listener=L, transport=T, socket=S, socket_options=O}) ->
 	% proc_lib sync requirement for start_link
 	ok = proc_lib:init_ack({ok, self()}),
 	% ranch sync requirement for socket ownership
@@ -95,7 +93,7 @@ init(State=#?STATE{listener=L, transport=T, socket=S, socket_options=O}) ->
 			O1 = lists:foldl(	fun(Key, Acc) ->
 									proplists:delete(Key, Acc)
 								end, O, ssl_options()),
-			State1 = State#?MODULE{socket_options=O1},
+			State1 = State#state{socket_options=O1},
 			case ssl:peercert(S) of
 				{ok, _} ->
 					init(State1, {check_addr, Addr});
@@ -114,11 +112,11 @@ init(State=#?STATE{listener=L, transport=T, socket=S, socket_options=O}) ->
 			init(State, {check_addr, Addr})
 	end.
 
-init(State=#?STATE{acl_socket_options=O}, {check_addr, Addr}) ->
+init(State=#state{acl_socket_options=O}, {check_addr, Addr}) ->
 	?LOG_INFO("acl pass from ~p", [Addr]),
-	init(State#?STATE{socket_options=O, context=[{auth, undefined}]}, ok);
+	init(State#state{socket_options=O, context=[{auth, undefined}]}, ok);
 
-init(State=#?STATE{transport=T, socket=S, socket_options=O,
+init(State=#state{transport=T, socket=S, socket_options=O,
 					dispatch=D, context=C}, ok) ->
 	ok = T:setopts(S, O),
 	case D:init(C) of
@@ -130,7 +128,7 @@ init(State=#?STATE{transport=T, socket=S, socket_options=O,
 				ok ->
 					process_flag(trap_exit, true),
 					T:setopts(S, [{active, once}]),
-					gen_server:enter_loop(?MODULE, [], State#?STATE{context=Context, timeout=Timeout}, Timeout);
+					gen_server:enter_loop(?MODULE, [], State#state{context=Context, timeout=Timeout}, Timeout);
 				{error, Reason} ->
 					?LOG_WARN("socket error ~p", [Reason]),
 					D:terminate(Reason, Context),
@@ -143,19 +141,19 @@ init(State=#?STATE{transport=T, socket=S, socket_options=O,
 		{noreply, Context, Timeout} ->
 			process_flag(trap_exit, true),
 			T:setopts(S, [{active, once}]),
-			gen_server:enter_loop(?MODULE, [], State#?STATE{context=Context, timeout=Timeout}, Timeout);
+			gen_server:enter_loop(?MODULE, [], State#state{context=Context, timeout=Timeout}, Timeout);
 		{stop, Reason} ->
 			?LOG_DEBUG("dispatch init failure ~p", [Reason]),
 			exit(normal)
 	end.
 
 %% Fallback
-handle_call(M, F, State=#?STATE{timeout=T}) ->
+handle_call(M, F, State=#state{timeout=T}) ->
 	?LOG_WARN("unknown call ~p from ~p", [M, F]),
 	{reply, {error, unknown}, State, T}.
 
 %% Async administrative commands.
-handle_cast({send, M}, State=#?STATE{transport=T, socket=S,
+handle_cast({send, M}, State=#state{transport=T, socket=S,
 								dispatch=D, context=C, timeout=T}) ->
 	Data = format(M),
 	?LOG_DEBUG("STREAM OUT: ~p", [Data]),
@@ -169,31 +167,31 @@ handle_cast({send, M}, State=#?STATE{transport=T, socket=S,
 			?LOG_WARN("socket exception ~p", [Exit]),
 			{stop, D:terminate(M, C), State}
 	end;
-handle_cast(stop, State=#?STATE{dispatch=D, context=C}) ->
+handle_cast(stop, State=#state{dispatch=D, context=C}) ->
 	{stop, D:terminate(normal, C), State};
 
 %% Fallback
-handle_cast(M, State=#?STATE{timeout=T}) ->
+handle_cast(M, State=#state{timeout=T}) ->
 	?LOG_WARN("unknown cast ~p", [M]),
 	{noreply, State, T}.
 
 %% Apply socket options.
-handle_info({setopts, O}, State=#?STATE{transport=T, socket=S, timeout=T}) ->
+handle_info({setopts, O}, State=#state{transport=T, socket=S, timeout=T}) ->
 	?LOG_DEBUG("setopts ~p", [O]),
 	T:setopts(S, [{active, once} | O]),
 	{noreply, State, T};
 
 %% Received tcp data, start parsing.
-handle_info({ssl, S, P}, State=#?STATE{socket=S}) ->
+handle_info({ssl, S, P}, State=#state{socket=S}) ->
 	handle_info({tcp, S, P}, State);
-handle_info({tcp, S, P}, State=#?STATE{transport=T, socket=S, buffer=B,
+handle_info({tcp, S, P}, State=#state{transport=T, socket=S, buffer=B,
 								dispatch=D, context=C}) ->
 	case P of
 		<<>> -> ok; % empty packet
 		_ -> ?LOG_DEBUG("STREAM IN ~p", [P])
 	end,
 	% Append the packet at the end of the buffer and start parsing.
-	case parse(State#?STATE{buffer= <<B/binary, P/binary>>}) of
+	case parse(State#state{buffer= <<B/binary, P/binary>>}) of
 		{ok, Message, State1} ->
 			% Parsed one message.
 			% Call dispatcher.
@@ -205,76 +203,76 @@ handle_info({tcp, S, P}, State=#?STATE{transport=T, socket=S, buffer=B,
 						ok ->
 							% Simulate new tcp data to trigger next parsing schedule.
 							self() ! {tcp, S, <<>>},
-							{noreply, State1#?STATE{context=Context, timeout=Timeout}, Timeout};
+							{noreply, State1#state{context=Context, timeout=Timeout}, Timeout};
 						{error, Reason} ->
 							?LOG_WARN("socket error ~p", [Reason]),
-							{stop, D:terminate(Reply, Context), State1#?STATE{context=Context}};
+							{stop, D:terminate(Reply, Context), State1#state{context=Context}};
 						Exit ->
 							?LOG_WARN("socket exception ~p", [Exit]),
-							{stop, D:terminate(Reply, Context), State1#?STATE{context=Context}}
+							{stop, D:terminate(Reply, Context), State1#state{context=Context}}
 					end;
 				{noreply, Context, Timeout} ->
 					self() ! {tcp, S, <<>>},
-					{noreply, State1#?STATE{context=Context, timeout=Timeout}, Timeout};
+					{noreply, State1#state{context=Context, timeout=Timeout}, Timeout};
 				{stop, Reason, Context} ->
 					?LOG_DEBUG("dispatch issued stop ~p", [Reason]),
-					{stop, D:terminate(Reason, Context), State1#?STATE{context=Context}}
+					{stop, D:terminate(Reason, Context), State1#state{context=Context}}
 			end;
 		{more, State1} ->
 			% The socket gets active after consuming previous data.
 			T:setopts(S, [{active, once}]),
-			{noreply, State1, State#?STATE.timeout};
+			{noreply, State1, State#state.timeout};
 		{error, Reason, State1} ->
 			?LOG_WARN("parse error ~p", [Reason]),
 			{stop, D:terminate(normal, C), State1}
 	end;
 
 %% Socket close detected.
-handle_info({ssl_closed, S}, State=#?STATE{socket=S}) ->
+handle_info({ssl_closed, S}, State=#state{socket=S}) ->
 	handle_info({tcp_closed, S}, State);
-handle_info({tcp_closed, S}, State=#?STATE{transport=T, socket=S, dispatch=D, context=C}) ->
+handle_info({tcp_closed, S}, State=#state{transport=T, socket=S, dispatch=D, context=C}) ->
 	T:close(S),
-	{stop, D:terminate(normal, C), State#?STATE{socket=undefined}};
+	{stop, D:terminate(normal, C), State#state{socket=undefined}};
 
 %% Socket error detected.
-handle_info({ssl_error, S, R}, State=#?STATE{socket=S, dispatch=D, context=C}) ->
+handle_info({ssl_error, S, R}, State=#state{socket=S, dispatch=D, context=C}) ->
 	?LOG_WARN("ssl error ~p", [R]),
 	{stop, D:terminate(normal, C), State};
-handle_info({tcp_error, S, R}, State=#?STATE{socket=S, dispatch=D, context=C}) ->
+handle_info({tcp_error, S, R}, State=#state{socket=S, dispatch=D, context=C}) ->
 	?LOG_WARN("tcp error ~p", [R]),
 	{stop, D:terminate(normal, C), State};
 
 %% Trap exit
-handle_info({'EXIT', F, R}, State=#?STATE{dispatch=D, context=C}) ->
+handle_info({'EXIT', F, R}, State=#state{dispatch=D, context=C}) ->
 	?LOG_WARN("trap exit ~p from ~p", [R, F]),
 	{stop, D:terminate(normal, C), State};
 
 %% Invoke dispatcher to handle all the other events.
-handle_info(M, State=#?STATE{transport=T, socket=S, dispatch=D, context=C}) ->
+handle_info(M, State=#state{transport=T, socket=S, dispatch=D, context=C}) ->
 	case D:handle_event(M, C) of
 		{reply, Reply, Context, Timeout} ->
 			Data = format(Reply),
 			?LOG_DEBUG("STREAM OUT ~p", [Data]),
 			case catch T:send(S, Data) of
 				ok ->
-					{noreply, State#?STATE{context=Context, timeout=Timeout}, Timeout};
+					{noreply, State#state{context=Context, timeout=Timeout}, Timeout};
 				{error, Reason} ->
 					?LOG_WARN("~p:send/1 error ~p", [T, Reason]),
-					{stop, D:terminate(Reply, Context), State#?STATE{context=Context}};
+					{stop, D:terminate(Reply, Context), State#state{context=Context}};
 				Exit ->
 					?LOG_WARN("~p:send/1 exception ~p", [T, Exit]),
-					{stop, D:terminate(Reply, Context), State#?STATE{context=Context}}
+					{stop, D:terminate(Reply, Context), State#state{context=Context}}
 			end;
 		{noreply, Context, Timeout} ->
-			{noreply, State#?STATE{context=Context, timeout=Timeout}, Timeout};
+			{noreply, State#state{context=Context, timeout=Timeout}, Timeout};
 		{stop, Reason, Context} ->
 			?LOG_DEBUG("dispatch issued stop ~p", [Reason]),
-			{stop, D:terminate(normal, Context), State#?STATE{context=Context}}
+			{stop, D:terminate(normal, Context), State#state{context=Context}}
 	end.
 
 %% Termination logic.
-terminate(R, State=#?STATE{transport=T}) ->
-	case State#?STATE.socket of
+terminate(R, State=#state{transport=T}) ->
+	case State#state.socket of
 		undefined ->
 			?LOG_INFO("~p closed by ~p", [T, R]);
 		Socket ->
@@ -289,14 +287,14 @@ code_change(V, State, Ex) ->
 %%
 %% Local functions
 %%
-parse(State=#?STATE{header=undefined, buffer= <<>>}) ->
+parse(State=#state{header=undefined, buffer= <<>>}) ->
 	% Not enough data to start parsing.
 	{more, State};
-parse(State=#?STATE{header=undefined, buffer=B}) ->
+parse(State=#state{header=undefined, buffer=B}) ->
 	% Read fixed header part and go on.
 	{Fixed, Rest} = read_fixed_header(B),
-	parse(State#?STATE{header=Fixed, buffer=Rest});
-parse(State=#?STATE{header=H, buffer=B, max_packet_size=M})
+	parse(State#state{header=Fixed, buffer=Rest});
+parse(State=#state{header=H, buffer=B, max_packet_size=M})
   when H#mqtt_header.size =:= undefined ->
 	% Read size part.
 	case decode_number(B) of
@@ -304,9 +302,9 @@ parse(State=#?STATE{header=H, buffer=B, max_packet_size=M})
 			H1 = H#mqtt_header{size=N},
 			case N of
 				_ when M < N+2 ->
-					{error, overflow, State#?STATE{header=H1}};
+					{error, overflow, State#state{header=H1}};
 				_ ->
-					parse(State#?STATE{header=H1, buffer=Payload})
+					parse(State#state{header=H1, buffer=Payload})
 			end;
 		more when M < size(B)+1 ->
 			{error, overflow, State};
@@ -315,13 +313,13 @@ parse(State=#?STATE{header=H, buffer=B, max_packet_size=M})
 		{error, Reason} ->
 			{error, Reason, State}
 	end;
-parse(State=#?STATE{header=H, buffer=B})
+parse(State=#state{header=H, buffer=B})
   when size(B) >= H#mqtt_header.size ->
 	% Ready to read payload.
 	case catch read_payload(H, B) of
 		{ok, Msg, Rest} ->
 			% Copy the buffer to prevent the binary from increasing indefinitely.
-			{ok, Msg, State#?STATE{header=undefined, buffer=Rest}};
+			{ok, Msg, State#state{header=undefined, buffer=Rest}};
 		{'EXIT', From, Reason} ->
 			{error, {'EXIT', From, Reason}}
 	end;
