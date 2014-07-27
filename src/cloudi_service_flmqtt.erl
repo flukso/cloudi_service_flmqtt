@@ -28,9 +28,9 @@ cloudi_service_init(_Args, Prefix, Dispatcher) ->
          {verify, verify_none},
          {max_connections, unlimited}],
         mqtt_protocol, % Protocol
-        [{dispatcher, cloudi_service:dispatcher(Dispatcher)}, % ProtoOpts
-         {context, create_context(Dispatcher)}, % cf cloudi_service_children.hrl
-         {prefix, Prefix}]
+        [{cloudi_dispatcher, cloudi_service:dispatcher(Dispatcher)}, % ProtoOpts
+         {cloudi_dispatcher_ctx, create_context(Dispatcher)}, % cf cloudi_service_children.hrl
+         {cloudi_prefix, Prefix}]
     ),
     {ok, #state{listener = ListenerPid,
                 service = Service}}.

@@ -23,28 +23,31 @@
 %%
 -export([init/1, handle_message/2, handle_event/2, terminate/2]).
 
+-include("props_to_record.hrl").
 -include("mqtt.hrl").
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
 -define(KEEPALIVE_MULTIPLIER, 1500).
+-define(TMPO_FORMAT, "/tmpo/sensor/~s/~s/~s/~s/~s").
 
 %% mqtt_protocol context
 -record(ctx, {
 		client_id :: binary(),
 		auth = cloudi_service_flmqtt_auth :: module(),
-		session :: pid(),
+		session = false :: boolean(),
 		valid_keep_alive = {10, 900} :: {MinSec :: integer(), MaxSec :: integer()},
 		timeout = 5000 :: timeout(),
-		timestamp :: timestamp()
+		timestamp :: timestamp(),
+		cloudi_dispatcher :: cloudi_service:dispatcher(),
+		cloudi_dispatcher_ctx :: any(),
+		cloudi_prefix :: list()
 }).
 
 -type context() :: #ctx{}.
 
 -spec init(params()) -> {noreply, context(), timeout()}.
 init(Params) ->
-	%Default = ?PROPS_TO_RECORD(fubar:settings(?MODULE), ctx),
-	%Context = ?PROPS_TO_RECORD(Params, ctx, Default)(),
-	Context = #ctx{},
+	Context = ?PROPS_TO_RECORD(Params, ctx),
 	?LOG_DEBUG("initializing with ~p", [Context]),
 	% Don't respond anything against tcp connection and apply small initial timeout.
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout}.
@@ -54,16 +57,16 @@ init(Params) ->
 		  {noreply, context(), timeout()} |
 		  {stop, Reason :: term()}.
 handle_message(Message=#mqtt_connect{protocol= <<"MQIsdp">>, version=3, client_id=ClientId},
-			   Context=#ctx{session=undefined}) ->
+			   Context=#ctx{session=false}) ->
 	?LOG_INFO("~p MSG IN ~p", [ClientId, Message]),
 	accept(Message, Context);
 handle_message(Message=#mqtt_connect{client_id=ClientId},
-				Context=#ctx{session=undefined})->
+				Context=#ctx{session=false})->
 	?LOG_INFO("~p MSG IN ~p", [ClientId, Message]),
 	Reply = mqtt:connack([{code, incompatible}]),
 	?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
-handle_message(Message, Context=#ctx{session=undefined}) ->
+handle_message(Message, Context=#ctx{session=false}) ->
 	% All the other messages are not allowed without session.
 	?LOG_WARN("illegal MSG IN ~p", [Message]),
 	{stop, normal, Context#ctx{timestamp=os:timestamp()}};
@@ -73,48 +76,31 @@ handle_message(Message=#mqtt_pingreq{}, Context) ->
 	Reply = #mqtt_pingresp{},
 	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.client_id, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_publish{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_publish{topic=Topic, qos=Qos, payload=Payload}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	case Message#mqtt_publish.dup of
-		false ->
-			case Message#mqtt_publish.qos of
-				at_most_once -> todo; % mqtt_stat:transient(mqtt_publish_0_in);
-				at_least_once -> todo; % mqtt_stat:transient(mqtt_publish_1_in);
-				exactly_once -> todo; % mqtt_stat:transient(mqtt_publish_2_in);
-				_ -> todo % mqtt_stat:transient(mqtt_publish_3_in)
-			end;
-		_ ->
-			ok
-	end,
-	Session ! Message,
+	publish(re:split(Topic, "/"), Payload, Context),
+	% TODO reply PUBACK for QoS1 messages
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_puback{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_puback{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	Session ! Message,
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_pubrec{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_pubrec{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	Session ! Message,
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_pubrel{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_pubrel{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	Session ! Message,
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_pubcomp{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_pubcomp{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	Session ! Message,
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_subscribe{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_subscribe{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	Session ! Message,
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_unsubscribe{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_unsubscribe{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	Session ! Message,
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_disconnect{}, Context=#ctx{session=Session}) ->
+handle_message(Message=#mqtt_disconnect{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
-	mqtt_session:stop(Session),
 	{stop, normal, Context#ctx{timestamp=os:timestamp()}};
 handle_message(Message, Context) ->
 	?LOG_WARN("~p unknown MSG IN ~p", [Context#ctx.client_id, Message]),
@@ -134,7 +120,7 @@ handle_event(timeout, Context=#ctx{client_id=ClientId}) ->
 handle_event({stop, From}, Context=#ctx{client_id=ClientId}) ->
 	?LOG_DEBUG("~p stop signal from ~p", [ClientId, From]),
 	{stop, normal, Context};
-handle_event(Event, Context=#ctx{session=undefined}) ->
+handle_event(Event, Context=#ctx{session=false}) ->
 	?LOG_ERROR("~p who sent this - ~p?", [Context#ctx.client_id,  Event]),
 	{stop, normal, Context};
 handle_event(Event=#mqtt_publish{}, Context) ->
@@ -196,7 +182,7 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 			Reply = mqtt:connack([{code, accepted}]),
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply,
-			 Context#ctx{client_id=ClientId, timeout=Timeout, timestamp=os:timestamp()}, Timeout};
+			 Context#ctx{session=true, client_id=ClientId, timeout=Timeout, timestamp=os:timestamp()}, Timeout};
 		{error, not_found} ->
 			?LOG_WARN("~p wrong username ~p", [ClientId, Username]),
 			Reply = mqtt:connack([{code, forbidden}]),
@@ -213,6 +199,16 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
 	end.
+
+publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, Context) ->
+	Dispatcher = Context#ctx.cloudi_dispatcher,
+	Name = cloudi_string:format(?TMPO_FORMAT, [Sid, Rid, Lvl, Bid, Ext]),
+	case cloudi_service:send_async(Dispatcher, Name, Payload) of
+		{ok, TransId} -> ?LOG_DEBUG("published to service ~p with UUID ~p", [Name, TransId]);
+		{error, Reason} -> ?LOG_ERROR("publishing to service ~p failed: ~p", [Name, Reason])
+	end;
+publish(TopicList, _Payload, _Context) ->
+	?LOG_WARN("unrecognized flmqtt topic: ~p", [TopicList]).
 
 timeout(infinity, _) ->
 	infinity;

@@ -56,6 +56,7 @@
 	socket :: socket(),
 	socket_options = [] :: params(),
 	acl_socket_options = [] :: params(),
+	proto_options = [] :: params(),
 	max_packet_size = 4194304 :: pos_integer(),
 	dispatch = cloudi_service_flmqtt_dispatch :: module(),
 	context = [] :: term(),
@@ -65,10 +66,9 @@
 }).
 
 %% ranch_conns_sup calls this callback function
-start_link(L, S, T, O) ->
-	%State = ?PROPS_TO_RECORD(Settings++O, state),
+start_link(L, S, T, ProtoOpts) ->
 	proc_lib:start_link(?MODULE, init,
-				[#state{listener=L, socket=S, transport=T}]).
+		[#state{listener=L, socket=S, transport=T, proto_options = ProtoOpts}]).
 
 init(State=#state{listener=L, transport=T, socket=S, socket_options=O}) ->
 	% proc_lib sync requirement for start_link
@@ -117,9 +117,9 @@ init(State=#state{acl_socket_options=O}, {check_addr, Addr}) ->
 	init(State#state{socket_options=O, context=[{auth, undefined}]}, ok);
 
 init(State=#state{transport=T, socket=S, socket_options=O,
-					dispatch=D, context=C}, ok) ->
+					dispatch=D, proto_options=P}, ok) ->
 	ok = T:setopts(S, O),
-	case D:init(C) of
+	case D:init(P) of
 		{reply, Reply, Context, Timeout} ->
 			% If there is a server initiated message
 			Data = format(Reply),
