@@ -99,7 +99,7 @@ handle_message(Message=#mqtt_pingreq{}, Context) ->
 	Reply = #mqtt_pingresp{},
 	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.client_id, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_publish{topic=Topic, qos=Qos, payload=Payload}, Context) ->
+handle_message(Message=#mqtt_publish{topic=Topic, qos=_Qos, payload=Payload}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.client_id, Message]),
 	publish(re:split(Topic, "/"), Payload, Context),
 	% TODO reply PUBACK for QoS1 messages
@@ -223,13 +223,8 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
 	end.
 
-publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, Context) ->
-	Dispatcher = Context#ctx.cloudi_dispatcher,
-	Name = cloudi_string:format(?TMPO_FORMAT, [Sid, Rid, Lvl, Bid, Ext]),
-	case cloudi_service:send_async(Dispatcher, Name, Payload) of
-		{ok, TransId} -> ?LOG_DEBUG("published to service ~p with UUID ~p", [Name, TransId]);
-		{error, Reason} -> ?LOG_ERROR("publishing to service ~p failed: ~p", [Name, Reason])
-	end;
+publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, _Context) ->
+	flmqtt_tmpo:sink(Sid, Rid, Lvl, Bid, Ext, Payload);
 publish(TopicList, _Payload, _Context) ->
 	?LOG_WARN("unrecognized flmqtt topic: ~p", [TopicList]).
 
