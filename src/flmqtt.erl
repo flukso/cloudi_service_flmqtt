@@ -5,13 +5,13 @@
 %%%
 %%% Created : Nov 14, 2012
 %%% -------------------------------------------------------------------
--module(mqtt).
+-module(flmqtt).
 -author("Sungjin Park <jinni.park@gmail.com>").
 
 %%
 %% Includes
 %%
--include("mqtt.hrl").
+-include("flmqtt.hrl").
 -include("props_to_record.hrl").
 
 %%

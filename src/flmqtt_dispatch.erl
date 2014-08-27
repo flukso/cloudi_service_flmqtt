@@ -3,37 +3,37 @@
 %%%           Bart Van Der Meerssche <bart@flukso.net>
 %%%
 %%% Description : MQTT dispatcher.
-%%%    This module implements the mqtt_protocol behaviour to function
+%%%    This module implements the flmqtt_protocol behaviour to function
 %%% as a central server endpoint to a Fluksometer. As such, the
 %%% dispatcher deviates from the typical MQTT broker implementations.
 %%% We're not trying to build a generic MQTT broker here, but terminate
-%%% the bridges set up at the Fluksometer side to collect the readings
-%%% published on the bridges. At a later stage, device management
-%%% functionality might be added to this dispatcher as well.
+%%% the bridge set up at the Fluksometer side to collect the published
+%%% readings. At a later stage, device management functionality might be
+%%% added to this dispatcher as well.
 %%%
 %%% Created : Nov 14, 2012
 %%% Trimmed : Jul 17, 2014
 %%% -------------------------------------------------------------------
--module(cloudi_service_flmqtt_dispatch).
+-module(flmqtt_dispatch).
 -author("Bart Van Der Meerssche <bart@flukso.net>").
-%-behavior(mqtt_protocol).
+%-behavior(flmqtt_protocol).
 
 %%
-%% mqtt_protocol callbacks
+%% flmqtt_protocol callbacks
 %%
 -export([init/1, handle_message/2, handle_event/2, terminate/2]).
 
 -include("props_to_record.hrl").
--include("mqtt.hrl").
+-include("flmqtt.hrl").
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
 -define(KEEPALIVE_MULTIPLIER, 1500).
 -define(TMPO_FORMAT, "/tmpo/sensor/~s/~s/~s/~s/~s").
 
-%% mqtt_protocol context
+%% flmqtt_protocol context
 -record(ctx, {
 		client_id :: binary(),
-		auth = cloudi_service_flmqtt_auth :: module(),
+		auth = flmqtt_auth :: module(),
 		session = false :: boolean(),
 		valid_keep_alive = {10, 900} :: {MinSec :: integer(), MaxSec :: integer()},
 		timeout = 5000 :: timeout(),
@@ -63,7 +63,7 @@ handle_message(Message=#mqtt_connect{protocol= <<"MQIsdp">>, version=3, client_i
 handle_message(Message=#mqtt_connect{client_id=ClientId},
 				Context=#ctx{session=false})->
 	?LOG_INFO("~p MSG IN ~p", [ClientId, Message]),
-	Reply = mqtt:connack([{code, incompatible}]),
+	Reply = flmqtt:connack([{code, incompatible}]),
 	?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 handle_message(Message, Context=#ctx{session=false}) ->
@@ -179,23 +179,23 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 			?LOG_DEBUG("~p authorized ~p", [ClientId, Username]),
 			KeepAlive = determine_keep_alive(Message#mqtt_connect.keep_alive, Context#ctx.valid_keep_alive),
 			Timeout = KeepAlive*?KEEPALIVE_MULTIPLIER,
-			Reply = mqtt:connack([{code, accepted}]),
+			Reply = flmqtt:connack([{code, accepted}]),
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply,
 			 Context#ctx{session=true, client_id=ClientId, timeout=Timeout, timestamp=os:timestamp()}, Timeout};
 		{error, not_found} ->
 			?LOG_WARN("~p wrong username ~p", [ClientId, Username]),
-			Reply = mqtt:connack([{code, forbidden}]),
+			Reply = flmqtt:connack([{code, forbidden}]),
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 		{error, forbidden} ->
 			?LOG_WARN("~p wrong password ~p", [ClientId, Username]),
-			Reply = mqtt:connack([{code, forbidden}]),
+			Reply = flmqtt:connack([{code, forbidden}]),
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 		Error ->
 			?LOG_ERROR("~p error ~p in ~p:verify/2", [ClientId, Error, Auth]),
-			Reply = mqtt:connack([{code, unavailable}]),
+			Reply = flmqtt:connack([{code, unavailable}]),
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
 	end.

@@ -27,7 +27,7 @@ cloudi_service_init(_Args, Prefix, Dispatcher) ->
          {keyfile, "/etc/ssl/private/staging.flukso.net.key"},
          {verify, verify_none},
          {max_connections, unlimited}],
-        mqtt_protocol, % Protocol
+        flmqtt_protocol, % Protocol
         [{cloudi_dispatcher, cloudi_service:dispatcher(Dispatcher)}, % ProtoOpts
          {cloudi_dispatcher_ctx, create_context(Dispatcher)}, % cf cloudi_service_children.hrl
          {cloudi_prefix, Prefix}]

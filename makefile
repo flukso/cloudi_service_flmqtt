@@ -32,6 +32,10 @@ stop:
 	@curl -X POST -d "[$(UUID)]" $(URL_PREFIX)/services_remove 
 	@echo
 
+list:
+	@curl $(URL_PREFIX)/services
+	@echo
+
 help:
 	@echo 'You need to have cloudi running (check with cloudi ping).'
 	@echo 'Makefile targets:'

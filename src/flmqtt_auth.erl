@@ -1,4 +1,4 @@
--module(cloudi_service_flmqtt_auth).
+-module(flmqtt_auth).
 
 -export([verify/2]).
 

@@ -3,10 +3,10 @@
    {vsn, "0.1.0"},
    {modules, [
         cloudi_service_flmqtt,
-        cloudi_service_flmqtt_dispatch,
-        cloudi_service_flmqtt_auth,
-        mqtt_protocol,
-        mqtt
+        flmqtt,
+        flmqtt_protocol,
+        flmqtt_dispatch,
+        flmqtt_auth,
         ]},
    {registered, []},
    {applications, [

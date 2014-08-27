@@ -3,16 +3,16 @@
 %%%          Bart Van Der Meerssche <bart@flukso.net>
 %%%
 %%% Description : MQTT protocol parser.
-%%%     mqtt_protocol is implemented as a ranch protocol handler.
-%%% ranch_conns_sup calls the mqtt_protocol:start_link/4 callback.
+%%%     flmqtt_protocol is implemented as a ranch protocol handler.
+%%% ranch_conns_sup calls the flmqtt_protocol:start_link/4 callback.
 %%% This gen_server receives tcp data from a socket and parses to
 %%% distill mqtt messages and hand them over to a dispatcher. The
-%%% dispatcher must implement mqtt_protocol callback behavior.
+%%% dispatcher must implement flmqtt_protocol callback behavior.
 %%%
 %%% Created : Nov 14, 2012
 %%% Trimmed : Jul 16, 2014
 %%% -------------------------------------------------------------------
--module(mqtt_protocol).
+-module(flmqtt_protocol).
 -author("Sungjin Park <jinni.park@gmail.com>").
 -behavior(gen_server).
 %-behavior(ranch_protocol).
@@ -23,11 +23,11 @@
 -export([start_link/4, init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--include("mqtt.hrl").
+-include("flmqtt.hrl").
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
 %%
-%% mqtt_protocol behavior callback definition
+%% flmqtt_protocol behavior callback definition
 %%
 -callback init(Context :: term()) ->
 		{reply, mqtt_message(), NewContext :: term(), timeout()} |
@@ -58,7 +58,7 @@
 	acl_socket_options = [] :: params(),
 	proto_options = [] :: params(),
 	max_packet_size = 4194304 :: pos_integer(),
-	dispatch = cloudi_service_flmqtt_dispatch :: module(),
+	dispatch = flmqtt_dispatch :: module(),
 	context = [] :: term(),
 	header,
 	buffer = <<>> :: binary(),
