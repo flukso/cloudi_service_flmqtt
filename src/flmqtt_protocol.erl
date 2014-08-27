@@ -1,19 +1,42 @@
-%%% -------------------------------------------------------------------
-%%% Author : Sungjin Park <jinni.park@gmail.com>
-%%%          Bart Van Der Meerssche <bart@flukso.net>
-%%%
-%%% Description : MQTT protocol parser.
-%%%     flmqtt_protocol is implemented as a ranch protocol handler.
+%%% @doc
+%%% ==FLMQTT protocol parser==
+%%% flmqtt_protocol is implemented as a ranch protocol handler.
 %%% ranch_conns_sup calls the flmqtt_protocol:start_link/4 callback.
 %%% This gen_server receives tcp data from a socket and parses to
 %%% distill mqtt messages and hand them over to a dispatcher. The
 %%% dispatcher must implement flmqtt_protocol callback behavior.
+%%% @end
 %%%
-%%% Created : Nov 14, 2012
-%%% Trimmed : Jul 16, 2014
-%%% -------------------------------------------------------------------
+%%% MIT LICENSE
+%%%
+%%% Copyright (c) 2014 Sungjin Park <jinni.park@gmail.com>
+%%%                    Bart Van Der Meerssche <bart@flukso.net>
+%%%
+%%% Permission is hereby granted, free of charge, to any person obtaining a copy
+%%% of this software and associated documentation files (the "Software"), to deal
+%%% in the Software without restriction, including without limitation the rights
+%%% to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+%%% copies of the Software, and to permit persons to whom the Software is
+%%% furnished to do so, subject to the following conditions:
+%%%
+%%% The above copyright notice and this permission notice shall be included in
+%%% all copies or substantial portions of the Software.
+%%%
+%%% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+%%% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+%%% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+%%% AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+%%% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+%%% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+%%% THE SOFTWARE.
+%%%
+%%% @author Sungjin Park <jinni.park@gmail.com>
+%%% @author Bart Van Der Meerssche <bart@flukso.net>
+%%% @copyright 2014 Sunjin Park
+%%% @copyright 2014 Bart Van Der Meerssche
+%%% @version 0.1.0 {@date} {@time}
+
 -module(flmqtt_protocol).
--author("Sungjin Park <jinni.park@gmail.com>").
 -behavior(gen_server).
 %-behavior(ranch_protocol).
 
