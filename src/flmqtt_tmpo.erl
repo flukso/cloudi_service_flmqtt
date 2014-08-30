@@ -33,17 +33,16 @@
 
 -export([sink/6]).
 
--define(TMPO_ROOT_DIR, <<"/var/run/flukso/tmpo/sensor/">>).
 -define(TMPO_TMP_DIR, <<"/var/run/flukso/tmpo/tmp/">>).
+-define(TMPO_ROOT_DIR, <<"/var/run/flukso/tmpo/sensor/">>).
 
 sink(Sid, Rid, Lvl, Bid, Ext, Payload) ->
-	TmpPath = path(?TMPO_TMP_DIR, Sid, Rid, Lvl, Bid, Ext),
-	ok = filelib:ensure_dir(TmpPath),
+	TmpPath = tmppath(Sid, Rid, Lvl, Bid, Ext),
 	{ok, Fd} = file:open(TmpPath, [write]),
 	ok = file:write(Fd, Payload),
 	ok = file:datasync(Fd),
 	ok = file:close(Fd),
-	Path = path(?TMPO_ROOT_DIR, Sid, Rid, Lvl, Bid, Ext),
+	Path = path(Sid, Rid, Lvl, Bid, Ext),
 	ok = filelib:ensure_dir(Path),
 	ok = file:rename(TmpPath, Path),
 	LvlInt = list_to_integer(binary_to_list(Lvl)),
@@ -54,7 +53,7 @@ sink(Sid, Rid, Lvl, Bid, Ext, Payload) ->
 clean(Sid, Rid, LvlInt, BidInt, Ext) when LvlInt > 8 ->
 	Children = children(LvlInt, BidInt),
 	ChildLvl = integer_to_list(LvlInt - 4),
-	[file:delete(path(?TMPO_ROOT_DIR, Sid, Rid, ChildLvl, Child, Ext)) || Child <- Children],
+	[file:delete(path(Sid, Rid, ChildLvl, Child, Ext)) || Child <- Children],
 	{ok, tmpo_block_cleaning_done};
 clean(_, _, _, _, _) ->
 	{ok, no_tmpo_block_cleaning_needed}.
@@ -63,6 +62,9 @@ children(LvlInt, BidInt) ->
 	Delta = trunc(math:pow(2, LvlInt - 4)),
 	[integer_to_list(BidInt + Pos * Delta) || Pos <- lists:seq(0, 15)].
 
-path(Prefix, Sid, Rid, Lvl, Bid, Ext) ->
-	iolist_to_binary([Prefix, Sid, "/", Rid, "/", Lvl, "/", Bid, ".", Ext]).
+tmppath(Sid, Rid, Lvl, Bid, Ext) ->
+	iolist_to_binary([?TMPO_TMP_DIR, Sid, "-", Rid, "-", Lvl, "-", Bid, ".", Ext]).
+
+path(Sid, Rid, Lvl, Bid, Ext) ->
+	iolist_to_binary([?TMPO_ROOT_DIR, Sid, "/", Rid, "/", Lvl, "/", Bid, ".", Ext]).
 
