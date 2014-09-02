@@ -38,19 +38,20 @@ sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
 		[list_to_integer(binary_to_list(X)) || X <- [Rid, Lvl, Bid]],
 	{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_sink, 
 		[Sid, RidInt, LvlInt, BidInt, Ext, timestamp(), Data]),
-	clean(Dispatcher, Sid, RidInt, LvlInt, Ext),
+	clean(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext),
 	{ok, tmpo_file_sunk}.
 
-clean(Dispatcher, Sid, RidInt, LvlInt, Ext) when LvlInt > 8 ->
+clean(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext) when LvlInt > 8 ->
+	LastChild = last_child(LvlInt, BidInt),
 	{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_clean,
-		[Sid, RidInt, LvlInt - 4, Ext]),
+		[Sid, RidInt, LvlInt - 4, LastChild, Ext]),
 	{ok, tmpo_block_cleaning_done};
-clean(_, _, _, _, _) ->
+clean(_,_, _, _, _, _) ->
 	{ok, no_tmpo_block_cleaning_needed}.
 
-children(LvlInt, BidInt) ->
+last_child(LvlInt, BidInt) ->
 	Delta = trunc(math:pow(2, LvlInt - 4)),
-	[integer_to_list(BidInt + Pos * Delta) || Pos <- lists:seq(0, 15)].
+	BidInt + 15 * Delta.
 
 timestamp() ->
     {MegaSeconds, Seconds, _MicroSeconds} = now(),

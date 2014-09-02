@@ -38,13 +38,13 @@
 -define(MYSQL_FLUKSO, "/db/mysql/flukso").
 
 -define(SQL_SENSORS,
-	"SELECT sensor FROM logger_meters WHERE device = ?").
+	"SELECT meter FROM logger_meters WHERE device = ?").
 -define(SQL_ENABLED_SENSORS,
-	"SELECT sensor FROM logger_meters WHERE device = ? AND enabled = 1").
+	"SELECT meter FROM logger_meters WHERE device = ? AND enabled = 1").
 -define(SQL_TMPO_SINK,
 	"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data) VALUES (?, ?, ?, ?, ?, ?, ?)").
 -define(SQL_TMPO_CLEAN,
-	"DELETE FROM tmpo WHERE sensor = ? AND rid = ? AND lvl = ? AND ext = ?").
+	"DELETE FROM tmpo WHERE sensor = ? AND rid = ? AND lvl = ? AND bid <= ? AND ext = ?").
 
 -define(STATEMENTS,
 	[{sensors, ?SQL_SENSORS},
