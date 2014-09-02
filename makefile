@@ -45,4 +45,4 @@ help:
 	@echo ' restart UUID="<<...>>"'
 	@echo ' stop UUID="<<...>>"'
 
-.PHONY: compile clean start restart stop help
+.PHONY: compile clean start restart stop list help

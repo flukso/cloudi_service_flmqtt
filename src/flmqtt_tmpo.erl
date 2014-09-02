@@ -31,29 +31,19 @@
 
 -module(flmqtt_tmpo).
 
--export([sink/6]).
+-export([sink/7]).
 
--define(TMPO_TMP_DIR, <<"/var/run/flukso/tmpo/tmp/">>).
--define(TMPO_ROOT_DIR, <<"/var/run/flukso/tmpo/sensor/">>).
-
-sink(Sid, Rid, Lvl, Bid, Ext, Payload) ->
-	TmpPath = tmppath(Sid, Rid, Lvl, Bid, Ext),
-	{ok, Fd} = file:open(TmpPath, [write]),
-	ok = file:write(Fd, Payload),
-	ok = file:datasync(Fd),
-	ok = file:close(Fd),
-	Path = path(Sid, Rid, Lvl, Bid, Ext),
-	ok = filelib:ensure_dir(Path),
-	ok = file:rename(TmpPath, Path),
-	LvlInt = list_to_integer(binary_to_list(Lvl)),
-	BidInt = list_to_integer(binary_to_list(Bid)),
-	clean(Sid, Rid, LvlInt, BidInt, Ext),
+sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
+	[RidInt, LvlInt, BidInt] =
+		[list_to_integer(binary_to_list(X)) || X <- [Rid, Lvl, Bid]],
+	{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_sink, 
+		[Sid, RidInt, LvlInt, BidInt, Ext, timestamp(), Data]),
+	clean(Dispatcher, Sid, RidInt, LvlInt, Ext),
 	{ok, tmpo_file_sunk}.
 
-clean(Sid, Rid, LvlInt, BidInt, Ext) when LvlInt > 8 ->
-	Children = children(LvlInt, BidInt),
-	ChildLvl = integer_to_list(LvlInt - 4),
-	[file:delete(path(Sid, Rid, ChildLvl, Child, Ext)) || Child <- Children],
+clean(Dispatcher, Sid, RidInt, LvlInt, Ext) when LvlInt > 8 ->
+	{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_clean,
+		[Sid, RidInt, LvlInt - 4, Ext]),
 	{ok, tmpo_block_cleaning_done};
 clean(_, _, _, _, _) ->
 	{ok, no_tmpo_block_cleaning_needed}.
@@ -62,9 +52,7 @@ children(LvlInt, BidInt) ->
 	Delta = trunc(math:pow(2, LvlInt - 4)),
 	[integer_to_list(BidInt + Pos * Delta) || Pos <- lists:seq(0, 15)].
 
-tmppath(Sid, Rid, Lvl, Bid, Ext) ->
-	iolist_to_binary([?TMPO_TMP_DIR, Sid, "-", Rid, "-", Lvl, "-", Bid, ".", Ext]).
-
-path(Sid, Rid, Lvl, Bid, Ext) ->
-	iolist_to_binary([?TMPO_ROOT_DIR, Sid, "/", Rid, "/", Lvl, "/", Bid, ".", Ext]).
+timestamp() ->
+    {MegaSeconds, Seconds, _MicroSeconds} = now(),
+    MegaSeconds * 1000000 + Seconds.
 

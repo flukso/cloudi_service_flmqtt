@@ -1,5 +1,5 @@
-.swp
-.eunit
+*.swp
+*.eunit
 deps
 *.o
 *.beam

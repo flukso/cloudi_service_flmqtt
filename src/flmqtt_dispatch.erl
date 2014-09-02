@@ -223,8 +223,9 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
 	end.
 
-publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, _Context) ->
-	flmqtt_tmpo:sink(Sid, Rid, Lvl, Bid, Ext, Payload);
+publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, Context) ->
+	Dispatcher = Context#ctx.cloudi_dispatcher,
+	flmqtt_tmpo:sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Payload);
 publish(TopicList, _Payload, _Context) ->
 	?LOG_WARN("unrecognized flmqtt topic: ~p", [TopicList]).
 
