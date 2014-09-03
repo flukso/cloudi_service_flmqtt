@@ -60,7 +60,6 @@
 %% flmqtt_protocol context
 -record(ctx, {
 		client_id :: binary(),
-		auth = flmqtt_auth :: module(),
 		state = ?STATE_INIT :: integer(),
 		valid_keep_alive = {10, 900} :: {MinSec :: integer(), MaxSec :: integer()},
 		timeout = 5000 :: timeout(),
@@ -197,8 +196,8 @@ terminate(Reason, Context) ->
 %% Local Functions
 %%
 accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Password},
-		Context=#ctx{auth=Auth}) ->
-	case Auth:verify(Username, Password) of
+		Context) ->
+	case flmqtt_auth:verify(Username, Password) of
 		ok ->
 			?LOG_DEBUG("~p authorized ~p", [ClientId, Username]),
 			KeepAlive = determine_keep_alive(
@@ -223,7 +222,7 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 		Error ->
-			?LOG_ERROR("~p error ~p in ~p:verify/2", [ClientId, Error, Auth]),
+			?LOG_ERROR("~p error ~p in flmqtt_auth:verify/2", [ClientId, Error]),
 			Reply = flmqtt:connack([{code, unavailable}]),
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
