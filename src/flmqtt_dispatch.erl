@@ -53,11 +53,15 @@
 -define(KEEPALIVE_MULTIPLIER, 1500).
 -define(TMPO_FORMAT, "/tmpo/sensor/~s/~s/~s/~s/~s").
 
+-define(STATE_INIT, 0).
+-define(STATE_SYNC, 1).
+-define(STATE_LIVE, 2).
+
 %% flmqtt_protocol context
 -record(ctx, {
 		client_id :: binary(),
 		auth = flmqtt_auth :: module(),
-		session = false :: boolean(),
+		state = ?STATE_INIT :: integer(),
 		valid_keep_alive = {10, 900} :: {MinSec :: integer(), MaxSec :: integer()},
 		timeout = 5000 :: timeout(),
 		timestamp :: timestamp(),
@@ -80,17 +84,17 @@ init(Params) ->
 		  {noreply, context(), timeout()} |
 		  {stop, Reason :: term()}.
 handle_message(Message=#mqtt_connect{protocol= <<"MQIsdp">>, version=3, client_id=ClientId},
-			   Context=#ctx{session=false}) ->
+			Context=#ctx{state=?STATE_INIT}) ->
 	?LOG_INFO("~p MSG IN ~p", [ClientId, Message]),
 	accept(Message, Context);
 handle_message(Message=#mqtt_connect{client_id=ClientId},
-				Context=#ctx{session=false})->
+			Context=#ctx{state=?STATE_INIT})->
 	?LOG_INFO("~p MSG IN ~p", [ClientId, Message]),
 	Reply = flmqtt:connack([{code, incompatible}]),
 	?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
-handle_message(Message, Context=#ctx{session=false}) ->
-	% All the other messages are not allowed without session.
+handle_message(Message, Context=#ctx{state=?STATE_INIT}) ->
+	% All the other messages are not allowed in STATE_INIT.
 	?LOG_WARN("illegal MSG IN ~p", [Message]),
 	{stop, normal, Context#ctx{timestamp=os:timestamp()}};
 handle_message(Message=#mqtt_pingreq{}, Context) ->
@@ -133,6 +137,8 @@ handle_message(Message, Context) ->
 		  {reply, mqtt_message(), context(), timeout()} |
 		  {noreply, context(), timeout()} |
 		  {stop, Reason :: term(), context()}.
+handle_event(timeout, Context=#ctx{state=?STATE_SYNC}) ->
+	sync(Context);
 handle_event(timeout, Context=#ctx{client_id=ClientId}) ->
 	% General timeout
 	case ClientId of
@@ -143,7 +149,7 @@ handle_event(timeout, Context=#ctx{client_id=ClientId}) ->
 handle_event({stop, From}, Context=#ctx{client_id=ClientId}) ->
 	?LOG_DEBUG("~p stop signal from ~p", [ClientId, From]),
 	{stop, normal, Context};
-handle_event(Event, Context=#ctx{session=false}) ->
+handle_event(Event, Context=#ctx{state=?STATE_INIT}) ->
 	?LOG_ERROR("~p who sent this - ~p?", [Context#ctx.client_id,  Event]),
 	{stop, normal, Context};
 handle_event(Event=#mqtt_publish{}, Context) ->
@@ -184,12 +190,7 @@ handle_event(Event, Context) ->
 
 -spec terminate(Reason :: term(), context()) -> Reason :: term().
 terminate(Reason, Context) ->
-	?LOG_DEBUG("~p terminating", [Context#ctx.client_id]),
-	case Reason of
-		#mqtt_publish{} -> Context#ctx.session ! {recover, Reason};
-		#mqtt_puback{} -> Context#ctx.session ! {recover, Reason};
-		_ -> ok
-	end,
+	?LOG_DEBUG("~p terminating with reason: ~p", [Context#ctx.client_id, Reason]),
 	normal.
 
 %%
@@ -200,12 +201,17 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 	case Auth:verify(Username, Password) of
 		ok ->
 			?LOG_DEBUG("~p authorized ~p", [ClientId, Username]),
-			KeepAlive = determine_keep_alive(Message#mqtt_connect.keep_alive, Context#ctx.valid_keep_alive),
+			KeepAlive = determine_keep_alive(
+				Message#mqtt_connect.keep_alive,
+				Context#ctx.valid_keep_alive),
 			Timeout = KeepAlive*?KEEPALIVE_MULTIPLIER,
 			Reply = flmqtt:connack([{code, accepted}]),
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
-			{reply, Reply,
-			 Context#ctx{session=true, client_id=ClientId, timeout=Timeout, timestamp=os:timestamp()}, Timeout};
+			{reply, Reply, Context#ctx{
+				state = ?STATE_SYNC,
+				client_id = ClientId,
+				timeout = Timeout,
+				timestamp = os:timestamp()}, 0}; % time out instantly to start sync
 		{error, not_found} ->
 			?LOG_WARN("~p wrong username ~p", [ClientId, Username]),
 			Reply = flmqtt:connack([{code, forbidden}]),
@@ -222,6 +228,15 @@ accept(Message=#mqtt_connect{client_id=ClientId, username=Username, password=Pas
 			?LOG_INFO("~p MSG OUT ~p", [ClientId, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
 	end.
+
+sync(Context) ->
+	?LOG_INFO("~p sending downstream sync message", [Context#ctx.client_id]),
+	Reply = flmqtt:publish([
+		{topic, <<"/topic">>},
+		{payload, <<"payload">>}]),
+	{reply, Reply, Context#ctx{
+		state = ?STATE_LIVE,
+		timestamp = os:timestamp()}, Context#ctx.timeout}.
 
 publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, Context) ->
 	Dispatcher = Context#ctx.cloudi_dispatcher,
