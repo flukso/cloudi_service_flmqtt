@@ -228,18 +228,22 @@ accept(Message=#mqtt_connect{username=Device, password=Key},
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
 	end.
 
-sync(Context) ->
-	?LOG_INFO("~p sending downstream sync message", [Context#ctx.device]),
+sync(Context=#ctx{device=Device, cloudi_dispatcher=Dispatcher}) ->
+	Topic = list_to_binary(["/d/device/", Device, "/tmpo/sync"]),
+	Payload = flmqtt_tmpo:sync(Dispatcher, Device),
+	?LOG_INFO("~p sending sync ~p with payload ~p", [Device, Topic, Payload]),
 	Reply = flmqtt:publish([
-		{topic, <<"/topic">>},
-		{payload, <<"payload">>}]),
+		{topic, Topic},
+		{payload, Payload}]),
 	{reply, Reply, Context#ctx{
 		state = ?STATE_LIVE,
 		timestamp = os:timestamp()}, Context#ctx.timeout}.
 
 publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, Context) ->
+	[RidInt, LvlInt, BidInt] =
+		[list_to_integer(binary_to_list(X)) || X <- [Rid, Lvl, Bid]],
 	Dispatcher = Context#ctx.cloudi_dispatcher,
-	flmqtt_tmpo:sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Payload);
+	flmqtt_tmpo:sink(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext, Payload);
 publish(TopicList, _Payload, Context) ->
 	?LOG_WARN("~p unrecognized flmqtt topic: ~p", [Context#ctx.device, TopicList]).
 

@@ -38,19 +38,32 @@
 -define(MYSQL_FLUKSO, "/db/mysql/flukso").
 
 -define(SQL_SENSORS,
-	"SELECT meter FROM logger_meters WHERE device = ?").
--define(SQL_ENABLED_SENSORS,
-	"SELECT meter FROM logger_meters WHERE device = ? AND enabled = 1").
+	"SELECT meter
+	 FROM logger_meters
+	 WHERE device = ?").
+-define(SQL_ACTIVE_SENSORS,
+	"SELECT meter
+	 FROM logger_meters
+	 WHERE device = ? AND enabled = 1").
 -define(SQL_TMPO_SINK,
-	"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data) VALUES (?, ?, ?, ?, ?, ?, ?)").
+	"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
+	 VALUES (?, ?, ?, ?, ?, ?, ?)").
 -define(SQL_TMPO_CLEAN,
-	"DELETE FROM tmpo WHERE sensor = ? AND rid = ? AND lvl = ? AND bid <= ? AND ext = ?").
+	"DELETE FROM tmpo
+	 WHERE sensor = ? AND rid = ? AND lvl = ? AND bid <= ? AND ext = ?").
+-define(SQL_TMPO_LAST,
+	"SELECT sensor, rid, lvl, bid, ext
+	 FROM tmpo
+	 WHERE sensor = ?
+	 ORDER BY created DESC, lvl DESC
+	 LIMIT 1").
 
 -define(STATEMENTS,
 	[{sensors, ?SQL_SENSORS},
-	 {enabled_sensors, ?SQL_ENABLED_SENSORS},
+	 {active_sensors, ?SQL_ACTIVE_SENSORS},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
-	 {tmpo_clean, ?SQL_TMPO_CLEAN}]).
+	 {tmpo_clean, ?SQL_TMPO_CLEAN},
+	 {tmpo_last, ?SQL_TMPO_LAST}]).
 
 prepare(Dispatcher) ->
 	[cloudi_service_db_mysql:prepare_query(Dispatcher, ?MYSQL_FLUKSO, Id, Query)
