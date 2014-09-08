@@ -104,9 +104,8 @@ handle_message(Message=#mqtt_pingreq{}, Context) ->
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_publish{topic=Topic, qos=_Qos, payload=Payload}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
-	publish(re:split(Topic, "/"), Payload, Context),
 	% TODO reply PUBACK for QoS1 messages
-	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
+	publish(re:split(Topic, "/"), Payload, Context);
 handle_message(Message=#mqtt_puback{}, Context) ->
 	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
@@ -231,7 +230,7 @@ accept(Message=#mqtt_connect{username=Device, password=Key},
 sync(Context=#ctx{device=Device, cloudi_dispatcher=Dispatcher}) ->
 	Topic = list_to_binary(["/d/device/", Device, "/tmpo/sync"]),
 	Payload = flmqtt_tmpo:sync(Dispatcher, Device),
-	?LOG_INFO("~p sending sync ~p with payload ~p", [Device, Topic, Payload]),
+	?LOG_INFO("~p tx sync ~p with payload ~p", [Device, Topic, Payload]),
 	Reply = flmqtt:publish([
 		{topic, Topic},
 		{payload, Payload}]),
@@ -239,13 +238,19 @@ sync(Context=#ctx{device=Device, cloudi_dispatcher=Dispatcher}) ->
 		state = ?STATE_LIVE,
 		timestamp = os:timestamp()}, Context#ctx.timeout}.
 
-publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, Context) ->
+publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload,
+		Context=#ctx{device=Device}) ->
+	?LOG_INFO("~p rx sync trigger from flm", [Device]),
+	sync(Context);
+publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload,
+		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout}) ->
 	[RidInt, LvlInt, BidInt] =
 		[list_to_integer(binary_to_list(X)) || X <- [Rid, Lvl, Bid]],
-	Dispatcher = Context#ctx.cloudi_dispatcher,
-	flmqtt_tmpo:sink(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext, Payload);
-publish(TopicList, _Payload, Context) ->
-	?LOG_WARN("~p unrecognized flmqtt topic: ~p", [Context#ctx.device, TopicList]).
+	flmqtt_tmpo:sink(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext, Payload),
+	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
+publish(TopicList, _Payload, Context=#ctx{device=Device, timeout=Timeout}) ->
+	?LOG_WARN("~p unrecognized flmqtt topic: ~p", [Device, TopicList]),
+	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout}.
 
 timeout(infinity, _) ->
 	infinity;

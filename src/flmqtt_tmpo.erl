@@ -46,7 +46,7 @@ sync(Dispatcher, Device) ->
 sync_sensor(Dispatcher, Sid) ->
 	case flmqtt_sql:execute(Dispatcher, tmpo_last, [Sid]) of
 		{ok, []} ->
-			[{sid, Sid}, {bid, 0}];
+			[{sid, Sid}, {rid, 0}, {lvl, 0}, {bid, 0}];
 		{ok, [[_Sid, Rid, Lvl, Bid, Ext]]} ->
 			clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
 			[{sid, Sid}, {rid, Rid}, {lvl, Lvl}, {bid, Bid}]
