@@ -54,8 +54,8 @@ cloudi_service_init(_Args, Prefix, Dispatcher) ->
         cloudi_x_ranch_ssl, % Transport
         [{port, 8883}, % TransOpts
          {cacertfile, "/etc/ssl/certs/flukso.ca.crt"},
-         {certfile, "/etc/ssl/certs/staging.flukso.net.crt"},
-         {keyfile, "/etc/ssl/private/staging.flukso.net.key"},
+         {certfile, "/etc/ssl/certs/api.flukso.net.crt"},
+         {keyfile, "/etc/ssl/private/api.flukso.net.key"},
          {verify, verify_none},
          {max_connections, unlimited}],
         flmqtt_protocol, % Protocol
