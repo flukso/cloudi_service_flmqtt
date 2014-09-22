@@ -56,6 +56,7 @@ clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext) when Lvl > 8 ->
 	LastChild = last_child(Lvl, Bid),
 	{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_clean,
 		[Sid, Rid, Lvl - 4, LastChild, Ext]),
+	clean(Dispatcher, Sid, Rid, Lvl - 4, LastChild, Ext),
 	{ok, tmpo_block_cleaning_done};
 clean(_,_, _, _, _, _) ->
 	{ok, no_tmpo_block_cleaning_needed}.
