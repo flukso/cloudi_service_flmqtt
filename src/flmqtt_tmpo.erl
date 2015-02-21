@@ -41,13 +41,18 @@
 sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
 	case check(timestamp(), blocksize(Lvl), Bid, Ext, magic(Data), byte_size(Data)) of
 		ok ->
-			{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_sink, 
-				[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
-			clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
-			?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
-			{ok, tmpo_file_sunk};
+			case flmqtt_sql:execute(Dispatcher, tmpo_sink, 
+					[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]) of
+				{ok, _Result} ->
+					clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
+					?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
+					{ok, tmpo_file_sunk};
+				{error, _Error} ->
+					{error, tmpo_sink_sql_error}
+			end;
 		{error, Error} ->
-			?LOG_WARN("~p rx tmpo error: ~p", [Sid, Error])
+			?LOG_WARN("~p rx tmpo error: ~p", [Sid, Error]),
+			{error, Error}
 	end.
 
 sync(Dispatcher, Device) ->
