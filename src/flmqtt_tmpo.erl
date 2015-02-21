@@ -33,11 +33,22 @@
 
 -export([sink/7, sync/2]).
 
+-include_lib("cloudi_core/include/cloudi_logger.hrl").
+
+-define(TMPO_MAX_BYTE_SIZE, 2097152). % 2MB
+-define(GZ_MAGIC_NUMBER, 8075). % 0x1f8b
+
 sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
-	{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_sink, 
-		[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
-	clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
-	{ok, tmpo_file_sunk}.
+	case check(timestamp(), blocksize(Lvl), Bid, Ext, magic(Data), byte_size(Data)) of
+		ok ->
+			{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_sink, 
+				[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
+			clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
+			?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
+			{ok, tmpo_file_sunk};
+		{error, Error} ->
+			?LOG_WARN("~p rx tmpo error: ~p", [Sid, Error])
+	end.
 
 sync(Dispatcher, Device) ->
 	{ok, Active} = flmqtt_sql:execute(Dispatcher, active_sensors, [Device]),
@@ -61,9 +72,29 @@ clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext) when Lvl > 8 ->
 clean(_,_, _, _, _, _) ->
 	{ok, no_tmpo_block_cleaning_needed}.
 
+check(_, _, _, _, _, Size) when Size > ?TMPO_MAX_BYTE_SIZE ->
+	{error, tmpo_max_byte_size};
+check(Timestamp, _, Bid, _, _, _) when Bid > Timestamp ->
+	{error, tmpo_blocks_from_future};
+check(_, Blocksize, Bid, _, _, _) when Bid rem Blocksize /= 0 ->
+	{error, no_blocksize_multiple};
+check(_, _, _, Ext, _, _) when Ext /= <<"gz">> ->
+	{error, no_gz_compression};
+check(_, _, _, <<"gz">>, Magic, _) when Magic /= ?GZ_MAGIC_NUMBER ->
+	{error, no_gz_magic_in_payload};
+check(_, _, _, _, _, _) ->
+	ok.
+
 last_child(Lvl, Bid) ->
-	Delta = trunc(math:pow(2, Lvl - 4)),
-	Bid + 15 * Delta.
+	Bid + 15 * blocksize(Lvl - 4).
+
+blocksize(Lvl) ->
+	trunc(math:pow(2, Lvl)).
+
+magic(<<>>) ->
+	0;
+magic(<<Magic:16, _/binary>>) ->
+	Magic.
 
 timestamp() ->
     {MegaSeconds, Seconds, _MicroSeconds} = now(),
