@@ -5,7 +5,7 @@
 %%%
 %%% MIT LICENSE
 %%%
-%%% Copyright (c) 2014 Bart Van Der Meerssche <bart@flukso.net>
+%%% Copyright (c) 2015 Bart Van Der Meerssche <bart@flukso.net>
 %%%
 %%% Permission is hereby granted, free of charge, to any person obtaining a copy
 %%% of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,7 @@
 %%% THE SOFTWARE.
 %%%
 %%% @author Bart Van Der Meerssche <bart@flukso.net>
-%%% @copyright 2014 Bart Van Der Meerssche
+%%% @copyright 2015 Bart Van Der Meerssche
 %%% @version 0.1.0 {@date} {@time}
 
 -module(cloudi_service_flmqtt).

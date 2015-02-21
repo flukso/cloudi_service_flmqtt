@@ -5,7 +5,7 @@
 %%%
 %%% MIT LICENSE
 %%%
-%%% Copyright (c) 2014 Bart Van Der Meerssche <bart@flukso.net>
+%%% Copyright (c) 2015 Bart Van Der Meerssche <bart@flukso.net>
 %%%
 %%% Permission is hereby granted, free of charge, to any person obtaining a copy
 %%% of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,7 @@
 %%% THE SOFTWARE.
 %%%
 %%% @author Bart Van Der Meerssche <bart@flukso.net>
-%%% @copyright 2014 Bart Van Der Meerssche
+%%% @copyright 2015 Bart Van Der Meerssche
 %%% @version 0.1.0 {@date} {@time}
 
 -module(flmqtt_sql).
@@ -37,6 +37,14 @@
 
 -define(MYSQL_FLUKSO, "/db/mysql/flukso").
 
+-define(SQL_AUTH_DEVICE,
+	"SELECT sha
+	 FROM logger_devices
+	 WHERE device = ?").
+-define(SQL_AUTH_SENSOR,
+	"SELECT device
+	 FROM logger_meters
+	 WHERE meter = ?").
 -define(SQL_SENSORS,
 	"SELECT meter
 	 FROM logger_meters
@@ -59,7 +67,9 @@
 	 LIMIT 1").
 
 -define(STATEMENTS,
-	[{sensors, ?SQL_SENSORS},
+	[{auth_device, ?SQL_AUTH_DEVICE},
+	 {auth_sensor, ?SQL_AUTH_SENSOR},
+	 {sensors, ?SQL_SENSORS},
 	 {active_sensors, ?SQL_ACTIVE_SENSORS},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
 	 {tmpo_clean, ?SQL_TMPO_CLEAN},

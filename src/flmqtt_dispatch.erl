@@ -12,7 +12,7 @@
 %%% MIT LICENSE
 %%%
 %%% Copyright (c) 2014 Sungjin Park <jinni.park@gmail.com>
-%%%                    Bart Van Der Meerssche <bart@flukso.net>
+%%%               2015 Bart Van Der Meerssche <bart@flukso.net>
 %%%
 %%% Permission is hereby granted, free of charge, to any person obtaining a copy
 %%% of this software and associated documentation files (the "Software"), to deal
@@ -35,7 +35,7 @@
 %%% @author Sungjin Park <jinni.park@gmail.com>
 %%% @author Bart Van Der Meerssche <bart@flukso.net>
 %%% @copyright 2014 Sunjin Park
-%%% @copyright 2014 Bart Van Der Meerssche
+%%% @copyright 2015 Bart Van Der Meerssche
 %%% @version 0.1.0 {@date} {@time}
 
 -module(flmqtt_dispatch).
@@ -195,8 +195,8 @@ terminate(Reason, Context) ->
 %% Local Functions
 %%
 accept(Message=#mqtt_connect{username=Device, password=Key},
-		Context) ->
-	case flmqtt_auth:verify(Device, Key) of
+		Context=#ctx{cloudi_dispatcher=Dispatcher}) ->
+	case flmqtt_auth:device(Dispatcher, Device, Key) of
 		ok ->
 			?LOG_DEBUG("~p authorized", [Device]),
 			KeepAlive = determine_keep_alive(
@@ -220,8 +220,8 @@ accept(Message=#mqtt_connect{username=Device, password=Key},
 			Reply = flmqtt:connack([{code, forbidden}]),
 			?LOG_INFO("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
-		Error ->
-			?LOG_ERROR("~p error ~p in flmqtt_auth:verify/2", [Device, Error]),
+		{error, Error} ->
+			?LOG_ERROR("~p error ~p in flmqtt_auth:device/2", [Device, Error]),
 			Reply = flmqtt:connack([{code, unavailable}]),
 			?LOG_INFO("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
@@ -243,10 +243,15 @@ publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload,
 	?LOG_INFO("~p rx sync trigger from flm", [Device]),
 	sync(Context);
 publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload,
-		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout}) ->
-	[RidInt, LvlInt, BidInt] =
-		[list_to_integer(binary_to_list(X)) || X <- [Rid, Lvl, Bid]],
-	flmqtt_tmpo:sink(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext, Payload),
+		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
+	case flmqtt_auth:sensor(Dispatcher, Sid, Device) of
+		ok ->
+			[RidInt, LvlInt, BidInt] =
+				[list_to_integer(binary_to_list(X)) || X <- [Rid, Lvl, Bid]],
+			flmqtt_tmpo:sink(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext, Payload);
+		_ ->
+			?LOG_WARN("~p rx invalid tmpo sid ~p", [Device, Sid])
+	end,
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
 publish(TopicList, _Payload, Context=#ctx{device=Device, timeout=Timeout}) ->
 	?LOG_WARN("~p unrecognized flmqtt topic: ~p", [Device, TopicList]),
