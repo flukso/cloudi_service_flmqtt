@@ -84,13 +84,13 @@ init(Params) ->
 		  {stop, Reason :: term()}.
 handle_message(Message=#mqtt_connect{protocol= <<"MQIsdp">>, version=3, username=Device},
 			Context=#ctx{state=?STATE_INIT}) ->
-	?LOG_INFO("~p MSG IN ~p", [Device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Device, Message]),
 	accept(Message, Context);
 handle_message(Message=#mqtt_connect{username=Device},
 			Context=#ctx{state=?STATE_INIT})->
-	?LOG_INFO("~p MSG IN ~p", [Device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Device, Message]),
 	Reply = flmqtt:connack([{code, incompatible}]),
-	?LOG_INFO("~p MSG OUT ~p", [Device, Reply]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Device, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 handle_message(Message, Context=#ctx{state=?STATE_INIT}) ->
 	% All the other messages are not allowed in STATE_INIT.
@@ -98,34 +98,34 @@ handle_message(Message, Context=#ctx{state=?STATE_INIT}) ->
 	{stop, normal, Context#ctx{timestamp=os:timestamp()}};
 handle_message(Message=#mqtt_pingreq{}, Context) ->
 	% Reflect ping and refresh timeout.
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	Reply = #mqtt_pingresp{},
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Reply]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_publish{topic=Topic, qos=_Qos, payload=Payload}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	% TODO reply PUBACK for QoS1 messages
 	publish(re:split(Topic, "/"), Payload, Context);
 handle_message(Message=#mqtt_puback{}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_pubrec{}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_pubrel{}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_pubcomp{}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_subscribe{}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_unsubscribe{}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_message(Message=#mqtt_disconnect{}, Context) ->
-	?LOG_INFO("~p MSG IN ~p", [Context#ctx.device, Message]),
+	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{stop, normal, Context#ctx{timestamp=os:timestamp()}};
 handle_message(Message, Context) ->
 	?LOG_WARN("~p unknown MSG IN ~p", [Context#ctx.device, Message]),
@@ -145,13 +145,13 @@ handle_event(timeout, Context=#ctx{device=Device}) ->
 	end,
 	{stop, normal, Context};
 handle_event({stop, From}, Context=#ctx{device=Device}) ->
-	?LOG_DEBUG("~p stop signal from ~p", [Device, From]),
+	?LOG_INFO("~p stop signal from ~p", [Device, From]),
 	{stop, normal, Context};
 handle_event(Event, Context=#ctx{state=?STATE_INIT}) ->
 	?LOG_ERROR("~p who sent this - ~p?", [Context#ctx.device,  Event]),
 	{stop, normal, Context};
 handle_event(Event=#mqtt_publish{}, Context) ->
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Event]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Event]),
 	case Event#mqtt_publish.dup of
 		false ->
 			case Event#mqtt_publish.qos of
@@ -165,22 +165,22 @@ handle_event(Event=#mqtt_publish{}, Context) ->
 	end,
 	{reply, Event, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_event(Event=#mqtt_puback{}, Context) ->
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Event]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Event]),
 	{reply, Event, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_event(Event=#mqtt_pubrec{}, Context) ->
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Event]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Event]),
 	{reply, Event, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_event(Event=#mqtt_pubrel{}, Context) ->
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Event]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Event]),
 	{reply, Event, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_event(Event=#mqtt_pubcomp{}, Context) ->
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Event]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Event]),
 	{reply, Event, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_event(Event=#mqtt_suback{}, Context) ->
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Event]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Event]),
 	{reply, Event, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_event(Event=#mqtt_unsuback{}, Context) ->
-	?LOG_INFO("~p MSG OUT ~p", [Context#ctx.device, Event]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Event]),
 	{reply, Event, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
 handle_event(Event, Context) ->
 	?LOG_WARN("~p unknown MSG OUT ~p", [Context#ctx.device, Event]),
@@ -198,13 +198,13 @@ accept(Message=#mqtt_connect{username=Device, password=Key},
 		Context=#ctx{cloudi_dispatcher=Dispatcher}) ->
 	case flmqtt_auth:device(Dispatcher, Device, Key) of
 		ok ->
-			?LOG_DEBUG("~p authorized", [Device]),
+			?LOG_INFO("~p authorized", [Device]),
 			KeepAlive = determine_keep_alive(
 				Message#mqtt_connect.keep_alive,
 				Context#ctx.valid_keep_alive),
 			Timeout = KeepAlive*?KEEPALIVE_MULTIPLIER,
 			Reply = flmqtt:connack([{code, accepted}]),
-			?LOG_INFO("~p MSG OUT ~p", [Device, Reply]),
+			?LOG_DEBUG("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{
 				state = ?STATE_SYNC,
 				device = Device,
@@ -213,17 +213,17 @@ accept(Message=#mqtt_connect{username=Device, password=Key},
 		{error, not_found} ->
 			?LOG_WARN("~p wrong username", [Device]),
 			Reply = flmqtt:connack([{code, forbidden}]),
-			?LOG_INFO("~p MSG OUT ~p", [Device, Reply]),
+			?LOG_DEBUG("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 		{error, forbidden} ->
 			?LOG_WARN("~p wrong password", [Device]),
 			Reply = flmqtt:connack([{code, forbidden}]),
-			?LOG_INFO("~p MSG OUT ~p", [Device, Reply]),
+			?LOG_DEBUG("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 		{error, Error} ->
 			?LOG_ERROR("~p error ~p in flmqtt_auth:device/2", [Device, Error]),
 			Reply = flmqtt:connack([{code, unavailable}]),
-			?LOG_INFO("~p MSG OUT ~p", [Device, Reply]),
+			?LOG_DEBUG("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
 	end.
 

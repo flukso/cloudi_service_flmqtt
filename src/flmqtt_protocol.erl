@@ -166,7 +166,7 @@ init(State=#state{transport=T, socket=S, socket_options=O,
 			T:setopts(S, [{active, once}]),
 			gen_server:enter_loop(?MODULE, [], State#state{context=Context, timeout=Timeout}, Timeout);
 		{stop, Reason} ->
-			?LOG_DEBUG("dispatch init failure ~p", [Reason]),
+			?LOG_WARN("dispatch init failure ~p", [Reason]),
 			exit(normal)
 	end.
 
@@ -238,7 +238,7 @@ handle_info({tcp, S, P}, State=#state{transport=T, socket=S, buffer=B,
 					self() ! {tcp, S, <<>>},
 					{noreply, State1#state{context=Context, timeout=Timeout}, Timeout};
 				{stop, Reason, Context} ->
-					?LOG_DEBUG("dispatch issued stop ~p", [Reason]),
+					?LOG_INFO("dispatch issued stop ~p", [Reason]),
 					{stop, D:terminate(Reason, Context), State1#state{context=Context}}
 			end;
 		{more, State1} ->

@@ -88,7 +88,7 @@ execute(Dispatcher, Id, Params) ->
 			?LOG_ERROR("~p returns error ~p", [?MYSQL_FLUKSO, Error]),
 			{error, Error};
 		{ok, {error, "not prepared"}} ->
-			?LOG_WARN("initializing prepared statements for ~p", [?MYSQL_FLUKSO]),
+			?LOG_INFO("initializing prepared statements for ~p", [?MYSQL_FLUKSO]),
 			prepare(Dispatcher),
 			execute(Dispatcher, Id, Params)
 	end. 
