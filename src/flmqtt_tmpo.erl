@@ -96,10 +96,10 @@ last_child(Lvl, Bid) ->
 blocksize(Lvl) ->
 	trunc(math:pow(2, Lvl)).
 
-magic(<<>>) ->
-	0;
 magic(<<Magic:16, _/binary>>) ->
-	Magic.
+	Magic;
+magic(_) ->
+	0.
 
 timestamp() ->
     {MegaSeconds, Seconds, _MicroSeconds} = now(),
