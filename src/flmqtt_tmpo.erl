@@ -56,7 +56,7 @@ sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
 	end.
 
 sync(Dispatcher, Device) ->
-	{ok, Active} = flmqtt_sql:execute(Dispatcher, active_sensors, [Device]),
+	{ok, Active} = flmqtt_sql:execute(Dispatcher, sensors_active, [Device]),
 	cloudi_x_jsx:encode([sync_sensor(Dispatcher, Sid) || [Sid] <- Active]).
 
 sync_sensor(Dispatcher, Sid) ->

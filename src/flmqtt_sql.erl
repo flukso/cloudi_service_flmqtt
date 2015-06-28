@@ -49,7 +49,7 @@
 	"SELECT meter
 	 FROM logger_meters
 	 WHERE device = ?").
--define(SQL_ACTIVE_SENSORS,
+-define(SQL_SENSORS_ACTIVE,
 	"SELECT meter
 	 FROM logger_meters
 	 WHERE device = ? AND enabled = 1").
@@ -70,7 +70,7 @@
 	[{auth_device, ?SQL_AUTH_DEVICE},
 	 {auth_sensor, ?SQL_AUTH_SENSOR},
 	 {sensors, ?SQL_SENSORS},
-	 {active_sensors, ?SQL_ACTIVE_SENSORS},
+	 {sensors_active, ?SQL_SENSORS_ACTIVE},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
 	 {tmpo_clean, ?SQL_TMPO_CLEAN},
 	 {tmpo_last, ?SQL_TMPO_LAST}]).
