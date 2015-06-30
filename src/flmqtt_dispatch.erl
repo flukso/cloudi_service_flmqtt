@@ -102,7 +102,7 @@ handle_message(Message=#mqtt_pingreq{}, Context) ->
 	Reply = #mqtt_pingresp{},
 	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_publish{topic=Topic, qos=_Qos, payload=Payload}, Context) ->
+handle_message(Message=#mqtt_publish{topic=Topic, payload=Payload}, Context) ->
 	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	% TODO reply PUBACK for QoS1 messages
 	publish(re:split(Topic, "/"), Payload, Context);
@@ -238,6 +238,16 @@ sync(Context=#ctx{device=Device, cloudi_dispatcher=Dispatcher}) ->
 		state = ?STATE_LIVE,
 		timestamp = os:timestamp()}, Context#ctx.timeout}.
 
+publish([<<>>, <<"device">>, Device, <<"config">>, <<"kube">>], _Payload,
+	Context=#ctx{cloudi_dispatcher=_Dispatcher, timeout=Timeout, device=Device}) ->
+	?LOG_DEBUG("~p rx kube config update", [Device]),
+	% TODO fill in stub
+	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
+publish([<<>>, <<"device">>, Device, <<"config">>, <<"sensor">>], Payload,
+		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
+	?LOG_DEBUG("~p rx sensor config update", [Device]),
+	flmqtt_sensor:config(Dispatcher, Device, Payload),
+	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
 publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload,
 		Context=#ctx{device=Device}) ->
 	?LOG_INFO("~p rx sync trigger from flm", [Device]),

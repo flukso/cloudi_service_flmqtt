@@ -53,6 +53,22 @@
 	"SELECT meter
 	 FROM logger_meters
 	 WHERE device = ? AND enabled = 1").
+-define(SQL_SENSOR_CONFIG,
+	"UPDATE logger_meters
+	 SET
+	 type = ?,
+	 class = ?,
+	 function = ?,
+	 voltage = ?,
+	 current = ?,
+	 constant = ?,
+	 kid = ?,
+	 rid = ?,
+	 data_type = ?,
+	 enabled = ?,
+	 port = ?,
+	 config = ?
+	 WHERE meter = ?").
 -define(SQL_TMPO_SINK,
 	"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
 	 VALUES (?, ?, ?, ?, ?, ?, ?)").
@@ -71,6 +87,7 @@
 	 {auth_sensor, ?SQL_AUTH_SENSOR},
 	 {sensors, ?SQL_SENSORS},
 	 {sensors_active, ?SQL_SENSORS_ACTIVE},
+	 {sensor_config, ?SQL_SENSOR_CONFIG},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
 	 {tmpo_clean, ?SQL_TMPO_CLEAN},
 	 {tmpo_last, ?SQL_TMPO_LAST}]).
@@ -84,6 +101,9 @@ execute(Dispatcher, Id, Params) ->
 		{ok, {ok, {mysql_result, _Structure, Result, _, _, _, _, [], []}}} ->
 			?LOG_DEBUG("~p returns result ~p", [?MYSQL_FLUKSO, Result]),
 			{ok, Result};
+		{ok, {ok, {mysql_result, [], [], _, _, _, _, Update, []}}} ->
+			?LOG_DEBUG("~p returns result ~p", [?MYSQL_FLUKSO, Update]),
+			{ok, Update};
 		{ok, {error, {mysql_result, [], [], _, _, _, _, [], Error}}} ->
 			?LOG_ERROR("~p returns error ~p", [?MYSQL_FLUKSO, Error]),
 			{error, Error};

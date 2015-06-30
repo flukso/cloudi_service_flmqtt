@@ -8,7 +8,8 @@
         flmqtt_dispatch,
         flmqtt_auth,
         flmqtt_sql,
-        flmqtt_tmpo
+        flmqtt_tmpo,
+        flmqtt_sensor
         ]},
    {registered, []},
    {applications, [
