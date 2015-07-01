@@ -62,12 +62,12 @@ update(Dispatcher, SidsDict, Config) ->
 	update(Dispatcher, Sid, Config, orddict:is_key(Sid, SidsDict)).
 
 update(Dispatcher, Sid, Config, true) ->
-	% TODO create rrd when needed (analog | pulse | cosem)
 	Args = [proplists:get_value(Key, Config) || Key <- ?PARAMS],
 	Port = to_json(proplists:get_value(<<"port">>, Config)),
 	Args1 = Args ++ [Port, timestamp(), Sid],
 	?LOG_DEBUG("~p sensor config with args: ~p", [Sid, Args1]),
 	{ok, _} = flmqtt_sql:execute(Dispatcher, sensor_config, Args1),
+	flmqtt_rrd:create(Sid, proplists:get_value(<<"class">>, Config)),
 	{ok, sensor_updated};
 update(_Dispatcher, _Sid, _Config, false) ->
 	{error, sensor_not_found}.
@@ -78,6 +78,6 @@ to_json(X) ->
 	cloudi_x_jsx:encode(X).
 
 timestamp() ->
-    {MegaSeconds, Seconds, _MicroSeconds} = now(),
-    MegaSeconds * 1000000 + Seconds.
+	{MegaSeconds, Seconds, _MicroSeconds} = now(),
+	MegaSeconds * 1000000 + Seconds.
 

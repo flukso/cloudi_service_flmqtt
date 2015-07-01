@@ -9,7 +9,8 @@
         flmqtt_auth,
         flmqtt_sql,
         flmqtt_tmpo,
-        flmqtt_sensor
+        flmqtt_sensor,
+        flmqtt_rrd
         ]},
    {registered, []},
    {applications, [
