@@ -66,7 +66,7 @@
 	 rid = ?,
 	 data_type = ?,
 	 enabled = ?,
-	 port = ?,
+	 ports = ?,
 	 config = ?
 	 WHERE meter = ?").
 -define(SQL_KUBES_CLEAR,
