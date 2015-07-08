@@ -10,7 +10,8 @@
         flmqtt_sql,
         flmqtt_tmpo,
         flmqtt_sensor,
-        flmqtt_rrd
+        flmqtt_rrd,
+        flmqtt_kube
         ]},
    {registered, []},
    {applications, [

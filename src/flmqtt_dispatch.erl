@@ -238,10 +238,10 @@ sync(Context=#ctx{device=Device, cloudi_dispatcher=Dispatcher}) ->
 		state = ?STATE_LIVE,
 		timestamp = os:timestamp()}, Context#ctx.timeout}.
 
-publish([<<>>, <<"device">>, Device, <<"config">>, <<"kube">>], _Payload,
-	Context=#ctx{cloudi_dispatcher=_Dispatcher, timeout=Timeout, device=Device}) ->
+publish([<<>>, <<"device">>, Device, <<"config">>, <<"kube">>], Payload,
+	Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
 	?LOG_DEBUG("~p rx kube config update", [Device]),
-	% TODO fill in stub
+	flmqtt_kube:config(Dispatcher, Device, Payload),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
 publish([<<>>, <<"device">>, Device, <<"config">>, <<"sensor">>], Payload,
 		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->

@@ -69,6 +69,37 @@
 	 port = ?,
 	 config = ?
 	 WHERE meter = ?").
+-define(SQL_KUBES_CLEAR,
+	"UPDATE kube
+	 SET
+	 name = NULL,
+	 config = ?,
+	 kid = NULL,
+	 enabled = 0
+	 WHERE device = ? AND kid IS NOT NULL").
+-define(SQL_KUBE_UPDATE,
+	"UPDATE kube
+	 SET
+	 name = ?,
+	 hw_type = ?,
+	 sw_version = ?,
+	 enabled = ?,
+	 device = ?,
+	 kid = ?,
+	 config = ?
+	 WHERE hw_id = ?").
+-define(SQL_KUBE_INSERT,
+	"INSERT INTO kube (
+	 name,
+	 hw_type,
+	 sw_version,
+	 enabled,
+	 device,
+	 kid,
+	 created,
+	 hw_id,
+	 config)
+	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").
 -define(SQL_TMPO_SINK,
 	"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
 	 VALUES (?, ?, ?, ?, ?, ?, ?)").
@@ -88,6 +119,9 @@
 	 {sensors, ?SQL_SENSORS},
 	 {sensors_active, ?SQL_SENSORS_ACTIVE},
 	 {sensor_config, ?SQL_SENSOR_CONFIG},
+	 {kubes_clear, ?SQL_KUBES_CLEAR},
+	 {kube_update, ?SQL_KUBE_UPDATE},
+	 {kube_insert, ?SQL_KUBE_INSERT},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
 	 {tmpo_clean, ?SQL_TMPO_CLEAN},
 	 {tmpo_last, ?SQL_TMPO_LAST}]).
@@ -101,9 +135,12 @@ execute(Dispatcher, Id, Params) ->
 		{ok, {ok, {mysql_result, _Structure, Result, _, _, _, _, [], []}}} ->
 			?LOG_DEBUG("~p returns result ~p", [?MYSQL_FLUKSO, Result]),
 			{ok, Result};
+		{ok, {ok, {mysql_result, [], [], _, _, _, _, "Rows matched: 0  Changed: 0  Warnings: 0", []}}} ->
+			?LOG_DEBUG("~p query triggered no updates", [?MYSQL_FLUKSO]),
+			{ok, no_update};
 		{ok, {ok, {mysql_result, [], [], _, _, _, _, Update, []}}} ->
 			?LOG_DEBUG("~p returns result ~p", [?MYSQL_FLUKSO, Update]),
-			{ok, Update};
+			{ok, updated};
 		{ok, {error, {mysql_result, [], [], _, _, _, _, [], Error}}} ->
 			?LOG_ERROR("~p returns error ~p", [?MYSQL_FLUKSO, Error]),
 			{error, Error};
