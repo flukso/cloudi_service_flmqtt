@@ -47,6 +47,7 @@
     }).
 
 cloudi_service_init(_Args, Prefix, Dispatcher) ->
+    flmqtt_sql:prepare(Dispatcher),
     Service = cloudi_service:self(Dispatcher),
     {ok, ListenerPid} = cloudi_x_ranch:start_listener(
         Service, % Ref
