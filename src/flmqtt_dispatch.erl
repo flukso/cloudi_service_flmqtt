@@ -221,7 +221,7 @@ accept(Message=#mqtt_connect{username=Device, password=Key},
 			?LOG_DEBUG("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0};
 		{error, Error} ->
-			?LOG_ERROR("~p error ~p in flmqtt_auth:device/2", [Device, Error]),
+			?LOG_ERROR("~p error ~p in flmqtt_auth:device/3", [Device, Error]),
 			Reply = flmqtt:connack([{code, unavailable}]),
 			?LOG_DEBUG("~p MSG OUT ~p", [Device, Reply]),
 			{reply, Reply, Context#ctx{timestamp=os:timestamp()}, 0}
