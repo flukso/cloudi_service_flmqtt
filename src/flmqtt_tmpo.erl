@@ -79,8 +79,8 @@ clean(_,_, _, _, _, _) ->
 
 check(_, _, _, _, _, Size) when Size > ?TMPO_MAX_BYTE_SIZE ->
 	{error, tmpo_max_byte_size};
-check(Timestamp, _, Bid, _, _, _) when Bid > Timestamp ->
-	{error, tmpo_blocks_from_future};
+%check(Timestamp, _, Bid, _, _, _) when Bid > Timestamp ->
+%	{error, tmpo_blocks_from_future};
 check(_, Blocksize, Bid, _, _, _) when Bid rem Blocksize /= 0 ->
 	{error, no_blocksize_multiple};
 check(_, _, _, Ext, _, _) when Ext /= <<"gz">> ->
