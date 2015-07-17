@@ -45,7 +45,7 @@
 	<<"kid">>,
 	<<"rid">>,
 	<<"data_type">>,
-	<<"enabled">>
+	<<"enable">>
 %	<<"port">>, % see port()
 ]).
 
