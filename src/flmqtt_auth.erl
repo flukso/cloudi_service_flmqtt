@@ -39,12 +39,9 @@ device(Dispatcher, Device, Key) ->
 sensor(Dispatcher, Sensor, Device) ->
 	verify(flmqtt_sql:execute(Dispatcher, auth_sensor, [Sensor]), Device).
 
-verify({ok, []}, _Credential) ->
+verify({selected, []}, _Credential) ->
 	{error, not_found};
-verify({ok, [[Credential]]}, Credential) ->
+verify({selected, [{Credential}]}, Credential) ->
 	ok;
-verify({ok, _Result}, _Credential) ->
-	{error, forbidden};
-verify({error, Error}, _Credential) ->
-	{error, Error}.
-
+verify({selected, _Result}, _Credential) ->
+	{error, forbidden}.

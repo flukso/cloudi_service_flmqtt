@@ -75,6 +75,9 @@
 init(Params) ->
 	Context = ?PROPS_TO_RECORD(Params, ctx),
 	?LOG_DEBUG("initializing with ~p", [Context]),
+	% TODO: Suboptimal to prepare statements for each conn init
+	% but it'll do for now.
+	flmqtt_sql:prepare(Context#ctx.cloudi_dispatcher),
 	% Don't respond anything against tcp connection and apply small initial timeout.
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout}.
 

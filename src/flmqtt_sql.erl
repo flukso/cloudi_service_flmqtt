@@ -38,23 +38,23 @@
 -define(MYSQL_FLUKSO, "/db/mysql/flukso").
 
 -define(SQL_AUTH_DEVICE,
-	"SELECT sha
+	<<"SELECT sha
 	 FROM logger_devices
-	 WHERE device = ?").
+	 WHERE device = ?">>).
 -define(SQL_AUTH_SENSOR,
-	"SELECT device
+	<<"SELECT device
 	 FROM logger_meters
-	 WHERE meter = ?").
+	 WHERE meter = ?">>).
 -define(SQL_SENSORS,
-	"SELECT meter
+	<<"SELECT meter
 	 FROM logger_meters
-	 WHERE device = ?").
+	 WHERE device = ?">>).
 -define(SQL_SENSORS_ACTIVE,
-	"SELECT meter
+	<<"SELECT meter
 	 FROM logger_meters
-	 WHERE device = ? AND enabled = 1").
+	 WHERE device = ? AND enabled = 1">>).
 -define(SQL_SENSOR_CONFIG,
-	"UPDATE logger_meters
+	<<"UPDATE logger_meters
 	 SET
 	 type = ?,
 	 class = ?,
@@ -68,17 +68,17 @@
 	 enabled = ?,
 	 ports = ?,
 	 config = ?
-	 WHERE meter = ?").
+	 WHERE meter = ?">>).
 -define(SQL_KUBES_CLEAR,
-	"UPDATE kube
+	<<"UPDATE kube
 	 SET
 	 name = NULL,
 	 config = ?,
 	 kid = NULL,
 	 enabled = 0
-	 WHERE device = ? AND kid IS NOT NULL").
+	 WHERE device = ? AND kid IS NOT NULL">>).
 -define(SQL_KUBE_UPDATE,
-	"UPDATE kube
+	<<"UPDATE kube
 	 SET
 	 name = ?,
 	 hw_type = ?,
@@ -87,9 +87,9 @@
 	 device = ?,
 	 kid = ?,
 	 config = ?
-	 WHERE hw_id = ?").
+	 WHERE hw_id = ?">>).
 -define(SQL_KUBE_INSERT,
-	"INSERT INTO kube (
+	<<"INSERT INTO kube (
 	 name,
 	 hw_type,
 	 sw_version,
@@ -99,19 +99,19 @@
 	 created,
 	 hw_id,
 	 config)
-	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").
+	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)">>).
 -define(SQL_TMPO_SINK,
-	"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
-	 VALUES (?, ?, ?, ?, ?, ?, ?)").
+	<<"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
+	 VALUES (?, ?, ?, ?, ?, ?, ?)">>).
 -define(SQL_TMPO_CLEAN,
-	"DELETE FROM tmpo
-	 WHERE sensor = ? AND rid = ? AND lvl = ? AND bid <= ? AND ext = ?").
+	<<"DELETE FROM tmpo
+	 WHERE sensor = ? AND rid = ? AND lvl = ? AND bid <= ? AND ext = ?">>).
 -define(SQL_TMPO_LAST,
-	"SELECT sensor, rid, lvl, bid, ext
+	<<"SELECT sensor, rid, lvl, bid, ext
 	 FROM tmpo
 	 WHERE sensor = ?
 	 ORDER BY created DESC, lvl DESC
-	 LIMIT 1").
+	 LIMIT 1">>).
 
 -define(STATEMENTS,
 	[{auth_device, ?SQL_AUTH_DEVICE},
@@ -127,26 +127,11 @@
 	 {tmpo_last, ?SQL_TMPO_LAST}]).
 
 prepare(Dispatcher) ->
-	[cloudi_service_db_mysql:prepare_query(Dispatcher, ?MYSQL_FLUKSO, Id, Query)
-		|| {Id, Query} <- ?STATEMENTS].
+	Result = [cloudi_service_db_mysql:prepare_query(Dispatcher, ?MYSQL_FLUKSO, Id, Query)
+		|| {Id, Query} <- ?STATEMENTS],
+	?LOG_DEBUG("~p prepared statement result: ~p", [?MYSQL_FLUKSO, Result]).
 
 execute(Dispatcher, Id, Params) ->
-	case cloudi_service_db_mysql:execute_query(Dispatcher, ?MYSQL_FLUKSO, Id, Params) of
-		{ok, {ok, {mysql_result, _Structure, Result, _, _, _, _, [], []}}} ->
-			?LOG_DEBUG("~p returns result ~p", [?MYSQL_FLUKSO, Result]),
-			{ok, Result};
-		{ok, {ok, {mysql_result, [], [], _, _, _, _, "Rows matched: 0  Changed: 0  Warnings: 0", []}}} ->
-			?LOG_DEBUG("~p query triggered no updates", [?MYSQL_FLUKSO]),
-			{ok, no_update};
-		{ok, {ok, {mysql_result, [], [], _, _, _, _, Update, []}}} ->
-			?LOG_DEBUG("~p returns result ~p", [?MYSQL_FLUKSO, Update]),
-			{ok, updated};
-		{ok, {error, {mysql_result, [], [], _, _, _, _, [], Error}}} ->
-			?LOG_ERROR("~p returns error ~p", [?MYSQL_FLUKSO, Error]),
-			{error, Error};
-		{ok, {error, "not prepared"}} ->
-			?LOG_INFO("initializing prepared statements for ~p", [?MYSQL_FLUKSO]),
-			prepare(Dispatcher),
-			execute(Dispatcher, Id, Params)
-	end. 
-
+	{{ok, Result}, _Pid} = cloudi_service_db_mysql:execute_query(Dispatcher, ?MYSQL_FLUKSO, Id, Params),
+	?LOG_DEBUG("~p ~p query with params ~p result: ~p", [?MYSQL_FLUKSO, Id, Params, Result]),
+    Result.

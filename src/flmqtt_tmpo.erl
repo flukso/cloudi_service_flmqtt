@@ -39,38 +39,29 @@
 -define(GZ_MAGIC_NUMBER, 8075). % 0x1f8b
 
 sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
-	case check(timestamp(), blocksize(Lvl), Bid, Ext, magic(Data), byte_size(Data)) of
-		ok ->
-			case flmqtt_sql:execute(Dispatcher, tmpo_sink, 
-					[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]) of
-				{ok, _Result} ->
-					clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
-					?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
-					{ok, tmpo_file_sunk};
-				{error, _Error} ->
-					{error, tmpo_sink_sql_error}
-			end;
-		{error, Error} ->
-			?LOG_WARN("~p rx tmpo error: ~p", [Sid, Error]),
-			{error, Error}
-	end.
+	ok = check(timestamp(), blocksize(Lvl), Bid, Ext, magic(Data), byte_size(Data)),
+	{updated, _Count} = flmqtt_sql:execute(Dispatcher, tmpo_sink, 
+							[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
+	clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
+	?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
+	{ok, tmpo_file_sunk}.
 
 sync(Dispatcher, Device) ->
-	{ok, Active} = flmqtt_sql:execute(Dispatcher, sensors_active, [Device]),
-	cloudi_x_jsx:encode([sync_sensor(Dispatcher, Sid) || [Sid] <- Active]).
+	{selected, Active} = flmqtt_sql:execute(Dispatcher, sensors_active, [Device]),
+	cloudi_x_jsx:encode([sync_sensor(Dispatcher, Sid) || {Sid} <- Active]).
 
 sync_sensor(Dispatcher, Sid) ->
 	case flmqtt_sql:execute(Dispatcher, tmpo_last, [Sid]) of
-		{ok, []} ->
+		{selected, []} ->
 			[{sid, Sid}, {rid, 0}, {lvl, 0}, {bid, 0}];
-		{ok, [[_Sid, Rid, Lvl, Bid, Ext]]} ->
+		{selected, [{_Sid, Rid, Lvl, Bid, Ext}]} ->
 			clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
 			[{sid, Sid}, {rid, Rid}, {lvl, Lvl}, {bid, Bid}]
 	end.
 
 clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext) when Lvl > 8 ->
 	LastChild = last_child(Lvl, Bid),
-	{ok, _Result} = flmqtt_sql:execute(Dispatcher, tmpo_clean,
+	{updated, _Count} = flmqtt_sql:execute(Dispatcher, tmpo_clean,
 		[Sid, Rid, Lvl - 4, LastChild, Ext]),
 	clean(Dispatcher, Sid, Rid, Lvl - 4, LastChild, Ext),
 	{ok, tmpo_block_cleaning_done};

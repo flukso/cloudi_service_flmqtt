@@ -1,15 +1,15 @@
-VSN=1.3.2
+VSN=1.5.1
 SERVICE=cloudi_service_flmqtt
 
 PATH_PREFIX=/usr/local
 CORE_PATH=$(PATH_PREFIX)/lib/cloudi-$(VSN)/lib/cloudi_core-$(VSN)
 
 HOST=localhost
-PORT=6467
-URL_PREFIX=http://$(HOST):$(PORT)/cloudi/api/erlang
+PORT=6464
+URL_PREFIX=http://$(HOST):$(PORT)/cloudi/api/rpc
 
 PWD=$(shell pwd)
-UUID=<<>>
+UUID=
 
 compile:
 	cp src/$(SERVICE).app.src ebin/$(SERVICE).app
@@ -19,21 +19,21 @@ clean:
 	rm ebin/*
 
 start:
-	@curl -X POST -d '"'$(PWD)/ebin'"' $(URL_PREFIX)/code_path_add
+	@curl -X POST -d '"'$(PWD)/ebin'"' $(URL_PREFIX)/code_path_add.erl
 	@echo
-	@curl -X POST -d @$(SERVICE).conf $(URL_PREFIX)/services_add
+	@curl -X POST -d @$(SERVICE).conf $(URL_PREFIX)/services_add.erl
 	@echo
 
 restart:
-	@curl -X POST -d "[$(UUID)]" $(URL_PREFIX)/services_restart
+	@curl -X POST -d '"['$(UUID)'"]' $(URL_PREFIX)/services_restart.erl
 	@echo
 
 stop:
-	@curl -X POST -d "[$(UUID)]" $(URL_PREFIX)/services_remove 
+	@curl -X POST -d '["'$(UUID)'"]' $(URL_PREFIX)/services_remove.erl
 	@echo
 
 list:
-	@curl $(URL_PREFIX)/services
+	@curl $(URL_PREFIX)/services.erl
 	@echo
 
 help:

@@ -33,10 +33,10 @@
 -behaviour(cloudi_service).
 
 % cloudi service callbacks
--export([cloudi_service_init/3,
+-export([cloudi_service_init/4,
          cloudi_service_handle_request/11,
          cloudi_service_handle_info/3,
-         cloudi_service_terminate/2]).
+         cloudi_service_terminate/3]).
 
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 -include_lib("cloudi_core/include/cloudi_service_children.hrl").
@@ -46,8 +46,7 @@
         service
     }).
 
-cloudi_service_init(_Args, Prefix, Dispatcher) ->
-    flmqtt_sql:prepare(Dispatcher),
+cloudi_service_init(_Args, Prefix, _Timeout, Dispatcher) ->
     Service = cloudi_service:self(Dispatcher),
     {ok, ListenerPid} = cloudi_x_ranch:start_listener(
         Service, % Ref
@@ -61,7 +60,6 @@ cloudi_service_init(_Args, Prefix, Dispatcher) ->
          {max_connections, unlimited}],
         flmqtt_protocol, % Protocol
         [{cloudi_dispatcher, cloudi_service:dispatcher(Dispatcher)}, % ProtoOpts
-         {cloudi_dispatcher_ctx, create_context(Dispatcher)}, % cf cloudi_service_children.hrl
          {cloudi_prefix, Prefix}]
     ),
     {ok, #state{listener = ListenerPid,
@@ -76,6 +74,6 @@ cloudi_service_handle_info(Request, State, _) ->
     ?LOG_WARN("Unknown info \"~p\"", [Request]),
     {noreply, State}.
 
-cloudi_service_terminate(_, #state{service = Service}) ->
+cloudi_service_terminate(_Reason, _Timeout, #state{service = Service}) ->
     cloudi_x_ranch:stop_listener(Service),
     ok.

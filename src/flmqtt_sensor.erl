@@ -50,8 +50,8 @@
 ]).
 
 config(Dispatcher, Device, Jconfig) ->
-	{ok, Result} = flmqtt_sql:execute(Dispatcher, sensors, [Device]),
-	Sids = [{Sid, true} || [Sid] <- Result],
+	{selected, Result} = flmqtt_sql:execute(Dispatcher, sensors, [Device]),
+	Sids = [{Sid, true} || {Sid} <- Result],
 	SidsDict = orddict:from_list(Sids),
 	[update(Dispatcher, SidsDict, Config) ||
 		{_Sidx, Config} <- cloudi_x_jsx:decode(Jconfig)].
@@ -66,7 +66,7 @@ update(Dispatcher, Sid, Config, true) ->
 	Port = to_json(proplists:get_value(<<"port">>, Config)),
 	Args1 = Args ++ [Port, timestamp(), Sid],
 	?LOG_DEBUG("~p sensor config with args: ~p", [Sid, Args1]),
-	{ok, _} = flmqtt_sql:execute(Dispatcher, sensor_config, Args1),
+	{updated, _Count} = flmqtt_sql:execute(Dispatcher, sensor_config, Args1),
 	flmqtt_rrd:create(Sid, proplists:get_value(<<"class">>, Config)),
 	{ok, sensor_updated};
 update(_Dispatcher, _Sid, _Config, false) ->

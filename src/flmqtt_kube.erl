@@ -43,7 +43,7 @@
 ]).
 
 config(Dispatcher, Device, Jconfig) ->
-	flmqtt_sql:execute(Dispatcher, kubes_clear, [timestamp(), Device]),
+	{updated, _Count} = flmqtt_sql:execute(Dispatcher, kubes_clear, [timestamp(), Device]),
 	[update(Dispatcher, Device, Kid, Config) ||
 		{Kid, Config} <- cloudi_x_jsx:decode(Jconfig)].
 
@@ -59,10 +59,10 @@ update(_Dispatcher, undefined, _Args) ->
 update(Dispatcher, _HwId, Args) ->
 	insert(Dispatcher, Args, flmqtt_sql:execute(Dispatcher, kube_update, Args)).
 
-insert(Dispatcher, [_, _, _, _, _, _, Config, _] = Args, {ok, no_update}) ->
-	{ok, _} = flmqtt_sql:execute(Dispatcher, kube_insert, Args ++ [Config]),
+insert(Dispatcher, [_, _, _, _, _, _, Config, _] = Args, {updated, 0}) ->
+	{updated, 1} = flmqtt_sql:execute(Dispatcher, kube_insert, Args ++ [Config]),
 	{ok, kube_inserted};
-insert(_Dispatcher, _Args, {ok, _}) ->
+insert(_Dispatcher, _Args, {updated, 1}) ->
 	{ok, kube_updated}.
 
 timestamp() ->
