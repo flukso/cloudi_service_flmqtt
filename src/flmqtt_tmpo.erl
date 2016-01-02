@@ -40,8 +40,8 @@
 
 sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
 	ok = check(timestamp(), blocksize(Lvl), Bid, Ext, magic(Data), byte_size(Data)),
-	{updated, _Count} = flmqtt_sql:execute(Dispatcher, tmpo_sink, 
-							[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
+	flmqtt_sql:execute(Dispatcher, tmpo_sink, 
+		[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
 	clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
 	?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
 	{ok, tmpo_file_sunk}.
