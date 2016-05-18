@@ -42,7 +42,7 @@ help:
 	@echo ' compile'
 	@echo ' clean'
 	@echo ' start'
-	@echo ' restart UUID="<<...>>"'
-	@echo ' stop UUID="<<...>>"'
+	@echo ' restart UUID="..."'
+	@echo ' stop UUID="..."'
 
 .PHONY: compile clean start restart stop list help

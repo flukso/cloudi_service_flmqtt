@@ -31,7 +31,7 @@
 
 -module(flmqtt_rrd).
 
--export([create/2]).
+-export([create/3]).
 
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
@@ -40,17 +40,22 @@
 -define(FLUKSO_PATH_DATA , "/var/lib/flukso/data/").
 -define(RRD_PATH_BASE, [?FLUKSO_PATH_DATA, "base/"]).
 -define(RRD_PATH_NIGHT, [?FLUKSO_PATH_DATA, "night/"]).
--define(RRD_CREATE_CLASSES, [
-	{<<"analog">>, true},
-	{<<"pulse">>, true},
-	{<<"cosem">>, true}
+-define(RRD_CREATE_TYPES, [
+	{<<"electricity">>, true},
+	{<<"gas">>, true},
+	{<<"water">>, true}
+]).
+-define(RRD_CREATE_SUBTYPES, [
+	{<<"pplus">>, true},
+	{undefined, true}
 ]).
 
-create(Sid, Class) ->
-	create(Sid, proplists:get_value(Class, ?RRD_CREATE_CLASSES),
+create(Sid, Type, Subtype) ->
+	create(Sid, proplists:get_value(Type, ?RRD_CREATE_TYPES),
+		proplists:get_value(Subtype, ?RRD_CREATE_SUBTYPES),
 		file:read_file_info(path(base, Sid))).
 
-create(Sid, true, {error, enoent}) ->
+create(Sid, true, true, {error, enoent}) ->
 	CmdBase = join([
 		"rrdtool create",
 		path(base, Sid),
@@ -78,7 +83,7 @@ create(Sid, true, {error, enoent}) ->
 	os:cmd(CmdNight),
 	file:change_owner(path(night, Sid), ?FLUKSO_UID, ?FLUKSO_GID),
 	{ok, created};
-create(_Sid, _Class, _Exists) ->
+create(_Sid, _Type, _Subtype, _Exists) ->
 	{ok, not_created}.
 
 path(base, Sid) ->

@@ -67,7 +67,8 @@ update(Dispatcher, Sid, Config, true) ->
 	Args1 = Args ++ [Port, timestamp(), Sid],
 	?LOG_DEBUG("~p sensor config with args: ~p", [Sid, Args1]),
 	{updated, _Count} = flmqtt_sql:execute(Dispatcher, sensor_config, Args1),
-	flmqtt_rrd:create(Sid, proplists:get_value(<<"class">>, Config)),
+	flmqtt_rrd:create(Sid, proplists:get_value(<<"type">>, Config),
+		proplists:get_value(<<"subtype">>, Config)),
 	{ok, sensor_updated};
 update(_Dispatcher, _Sid, _Config, false) ->
 	{error, sensor_not_found}.
