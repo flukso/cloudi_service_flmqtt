@@ -57,6 +57,7 @@
 	<<"UPDATE logger_meters
 	 SET
 	 type = ?,
+	 subtype = ?,
 	 class = ?,
 	 function = ?,
 	 voltage = ?,

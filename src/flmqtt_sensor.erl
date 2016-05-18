@@ -37,6 +37,7 @@
 
 -define(PARAMS, [
 	<<"type">>,
+    <<"subtype">>,
 	<<"class">>,
 	<<"function">>,
 	<<"voltage">>,
