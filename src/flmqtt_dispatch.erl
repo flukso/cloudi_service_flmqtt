@@ -246,6 +246,11 @@ publish([<<>>, <<"device">>, Device, <<"config">>, <<"kube">>], Payload,
 	?LOG_DEBUG("~p rx kube config update", [Device]),
 	flmqtt_kube:config(Dispatcher, Device, Payload),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
+publish([<<>>, <<"device">>, Device, <<"config">>, <<"flx">>], Payload,
+	Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
+	?LOG_DEBUG("~p rx flx/port config update", [Device]),
+	flmqtt_port:config(Dispatcher, Device, Payload),
+	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
 publish([<<>>, <<"device">>, Device, <<"config">>, <<"sensor">>], Payload,
 		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
 	?LOG_DEBUG("~p rx sensor config update", [Device]),

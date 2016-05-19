@@ -10,6 +10,7 @@
         flmqtt_sql,
         flmqtt_tmpo,
         flmqtt_sensor,
+        flmqtt_port,
         flmqtt_rrd,
         flmqtt_kube
         ]},

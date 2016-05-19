@@ -101,6 +101,30 @@
 	 hw_id,
 	 config)
 	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)">>).
+-define(SQL_PORT_UPDATE,
+	<<"UPDATE port
+	 SET
+	 name = ?,
+	 class = ?,
+	 current = ?,
+	 constant = ?,
+	 dsmr = ?,
+	 enabled = ?,
+	 config = ?
+	 WHERE device = ? AND port = ?">>).
+-define(SQL_PORT_INSERT,
+	<<"INSERT INTO port (
+	 name,
+	 class,
+	 current,
+	 constant,
+	 dsmr,
+	 enabled,
+	 created,
+	 device,
+	 port,
+	 config)
+	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>).
 -define(SQL_TMPO_SINK,
 	<<"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
 	 VALUES (?, ?, ?, ?, ?, ?, ?)">>).
@@ -123,6 +147,8 @@
 	 {kubes_clear, ?SQL_KUBES_CLEAR},
 	 {kube_update, ?SQL_KUBE_UPDATE},
 	 {kube_insert, ?SQL_KUBE_INSERT},
+	 {port_update, ?SQL_PORT_UPDATE},
+	 {port_insert, ?SQL_PORT_INSERT},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
 	 {tmpo_clean, ?SQL_TMPO_CLEAN},
 	 {tmpo_last, ?SQL_TMPO_LAST}]).
