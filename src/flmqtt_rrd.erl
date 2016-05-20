@@ -31,7 +31,7 @@
 
 -module(flmqtt_rrd).
 
--export([create/3]).
+-export([create/3, update/2]).
 
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
@@ -56,8 +56,7 @@ create(Sid, Type, Subtype) ->
 		file:read_file_info(path(base, Sid))).
 
 create(Sid, true, true, {error, enoent}) ->
-	CmdBase = join([
-		"rrdtool create",
+	CmdBase = erlrrd:c([
 		path(base, Sid),
 		"-b 1199487600",
 		"-s 60",
@@ -66,33 +65,30 @@ create(Sid, true, true, {error, enoent}) ->
 		"RRA:AVERAGE:0.5:15:672",
 		"RRA:AVERAGE:0.5:1440:365",
 		"RRA:AVERAGE:0.5:10080:520"
-	], " "),
+	]),
 	?LOG_DEBUG("rrdcreate base command: ~p", [CmdBase]),
-	os:cmd(CmdBase),
+	erlrrd:create(CmdBase),
 	file:change_owner(path(base, Sid), ?FLUKSO_UID, ?FLUKSO_GID),
-	CmdNight = join([
-		"rrdtool create",
+	CmdNight = erlrrd:c([
 		path(night, Sid),
 		"-b 1199487600",
 		"-s 86400",
 		"DS:meter:GAUGE:8640000:-20:20",
 		"RRA:AVERAGE:0.5:1:365",
 		"RRA:AVERAGE:0.5:7:520"
-	], " "),
+	]),
 	?LOG_DEBUG("rrdcreate night command: ~p", [CmdNight]),
-	os:cmd(CmdNight),
+	erlrrd:create(CmdNight),
 	file:change_owner(path(night, Sid), ?FLUKSO_UID, ?FLUKSO_GID),
 	{ok, created};
 create(_Sid, _Type, _Subtype, _Exists) ->
 	{ok, not_created}.
 
+update(Sid, Data) ->
+	erlrrd:update([path(base, Sid), " ", Data]).
+
 path(base, Sid) ->
 	[?RRD_PATH_BASE, binary_to_list(Sid), ".rrd"];
 path(night, Sid) ->
 	[?RRD_PATH_NIGHT, binary_to_list(Sid), ".rrd"].
-
-join([Head | []], _Sep) ->
-	[Head];
-join([Head | Tail], Sep) ->
-	[Head, Sep | join(Tail, Sep)].
 
