@@ -11,15 +11,20 @@ URL_PREFIX=http://$(HOST):$(PORT)/cloudi/api/rpc
 PWD=$(shell pwd)
 UUID=
 
-compile:
+compile: erlrrd
 	cp src/$(SERVICE).app.src ebin/$(SERVICE).app
 	erlc -pz $(CORE_PATH) -pz $(CORE_PATH)/ebin -o ebin/ src/*.erl
+
+erlrrd:
+	@(cd deps/erlrrd;$(MAKE))
 
 clean:
 	rm ebin/*
 
 start:
 	@curl -X POST -d '"'$(PWD)/ebin'"' $(URL_PREFIX)/code_path_add.erl
+	@echo
+	@curl -X POST -d '"'$(PWD)/deps/erlrrd/ebin'"' $(URL_PREFIX)/code_path_add.erl
 	@echo
 	@curl -X POST -d @$(SERVICE).conf $(URL_PREFIX)/services_add.erl
 	@echo
@@ -45,4 +50,4 @@ help:
 	@echo ' restart UUID="..."'
 	@echo ' stop UUID="..."'
 
-.PHONY: compile clean start restart stop list help
+.PHONY: compile erlrrd clean start restart stop list help

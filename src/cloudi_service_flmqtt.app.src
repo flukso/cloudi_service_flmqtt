@@ -16,6 +16,7 @@
         ]},
    {registered, []},
    {applications, [
+        erlrrd,
         cloudi_core,
         cloudi_x_cowboy,
         cloudi_x_ranch,

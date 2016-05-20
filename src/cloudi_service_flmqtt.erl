@@ -47,6 +47,7 @@
     }).
 
 cloudi_service_init(_Args, Prefix, _Timeout, Dispatcher) ->
+    ok = application:start(erlrrd),
     Service = cloudi_service:self(Dispatcher),
     {ok, ListenerPid} = cloudi_x_ranch:start_listener(
         Service, % Ref
@@ -76,4 +77,5 @@ cloudi_service_handle_info(Request, State, _) ->
 
 cloudi_service_terminate(_Reason, _Timeout, #state{service = Service}) ->
     cloudi_x_ranch:stop_listener(Service),
+    ok = application:stop(erlrrd),
     ok.
