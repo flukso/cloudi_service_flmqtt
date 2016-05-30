@@ -60,6 +60,7 @@
 %% flmqtt_protocol context
 -record(ctx, {
 		device :: binary(),
+		hardware :: integer(),
 		state = ?STATE_INIT :: integer(),
 		valid_keep_alive = {10, 900} :: {MinSec :: integer(), MaxSec :: integer()},
 		timeout = 5000 :: timeout(),
@@ -200,7 +201,7 @@ terminate(Reason, Context) ->
 accept(Message=#mqtt_connect{username=Device, password=Key},
 		Context=#ctx{cloudi_dispatcher=Dispatcher}) ->
 	case flmqtt_auth:device(Dispatcher, Device, Key) of
-		ok ->
+		{ok, Hardware} ->
 			?LOG_INFO("~p authorized", [Device]),
 			KeepAlive = determine_keep_alive(
 				Message#mqtt_connect.keep_alive,
@@ -211,6 +212,7 @@ accept(Message=#mqtt_connect{username=Device, password=Key},
 			{reply, Reply, Context#ctx{
 				state = ?STATE_SYNC,
 				device = Device,
+				hardware = Hardware,
 				timeout = Timeout,
 				timestamp = os:timestamp()}, 0}; % time out instantly to start sync
 		{error, not_found} ->
@@ -261,12 +263,14 @@ publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload,
 	?LOG_INFO("~p rx sync trigger from flm", [Device]),
 	sync(Context);
 publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload,
-		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
+		Context=#ctx{cloudi_dispatcher=Dispatcher,timeout=Timeout,
+		device=Device, hardware=Hardware}) ->
 	case flmqtt_auth:sensor(Dispatcher, Sid, Device) of
 		ok ->
 			[RidInt, LvlInt, BidInt] =
 				[list_to_integer(binary_to_list(X)) || X <- [Rid, Lvl, Bid]],
-			flmqtt_tmpo:sink(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext, Payload);
+			flmqtt_tmpo:sink(Dispatcher, Sid, RidInt, LvlInt, BidInt, Ext, Payload),
+			flmqtt_rrd:update(Hardware, Sid, LvlInt, Payload);
 		_ ->
 			?LOG_WARN("~p rx invalid tmpo sid ~p", [Device, Sid])
 	end,

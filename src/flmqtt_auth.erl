@@ -43,5 +43,7 @@ verify({selected, []}, _Credential) ->
 	{error, not_found};
 verify({selected, [{Credential}]}, Credential) ->
 	ok;
+verify({selected, [{Credential, Hardware}]}, Credential) ->
+	{ok, Hardware};
 verify({selected, _Result}, _Credential) ->
 	{error, forbidden}.

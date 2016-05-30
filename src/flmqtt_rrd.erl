@@ -31,10 +31,11 @@
 
 -module(flmqtt_rrd).
 
--export([create/3, update/2]).
+-export([create/3, update/4]).
 
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
+-define(FLM03E_HARDWARE, 35).
 -define(FLUKSO_UID, 1000).
 -define(FLUKSO_GID, 1000).
 -define(FLUKSO_PATH_DATA , "/var/lib/flukso/data/").
@@ -84,8 +85,37 @@ create(Sid, true, true, {error, enoent}) ->
 create(_Sid, _Type, _Subtype, _Exists) ->
 	{ok, not_created}.
 
-update(Sid, Data) ->
-	erlrrd:update([path(base, Sid), " ", Data]).
+% only update existing rrd from a tmpo block8 for FLM03E+
+update(Hardware, Sid, 8, Gzdata) when Hardware >= ?FLM03E_HARDWARE ->
+	update(Sid, file:read_file_info(path(base, Sid)), Gzdata);
+update(_Hardware, _Sid, _Lvl, _Gzdata) ->
+	{ok, no_rrd_update}.
+
+update(Sid, {ok, _Fileinfo}, Gzdata) ->
+	Jdata = cloudi_x_jsx:decode(zlib:gunzip(Gzdata), [{labels, atom}]),
+	?LOG_DEBUG("rrd:update Jdata: ~p", [Jdata]),
+	Trel = proplists:get_value(t, Jdata),
+	Vrel = proplists:get_value(v, Jdata),
+	[Thead, Vhead] = proplists:get_value(head,
+		proplists:get_value(h, Jdata)),
+	Tabs = rel_to_abs(tl(Trel), [Thead]),
+	Vabs = rel_to_abs(tl(Vrel), [Vhead]),
+	Data = [[integer_to_list(Time), ":", number_to_list(Value), " "]
+		|| {Time, Value} <- lists:zip(Tabs, Vabs)],
+	Return = erlrrd:update([path(base, Sid), " ", Data]),
+	?LOG_DEBUG("rrd:update Data: ~p Return: ~p", [Data, Return]);
+update(_Sid, {error, enoent}, _Gzdata) ->
+	{ok, no_rrd_found}.
+
+number_to_list(X) when is_integer(X) ->
+	integer_to_list(X);
+number_to_list(X) when is_float(X) ->
+	float_to_list(X, [{decimals, 0}]).
+ 
+rel_to_abs([], Abs) ->
+	lists:reverse(Abs);
+rel_to_abs([Hrel | Trel], [Habs | Tabs]) ->
+	rel_to_abs(Trel, [Hrel + Habs | [Habs | Tabs]]).
 
 path(base, Sid) ->
 	[?RRD_PATH_BASE, binary_to_list(Sid), ".rrd"];
