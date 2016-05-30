@@ -254,9 +254,10 @@ publish([<<>>, <<"device">>, Device, <<"config">>, <<"flx">>], Payload,
 	flmqtt_port:config(Dispatcher, Device, Payload),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
 publish([<<>>, <<"device">>, Device, <<"config">>, <<"sensor">>], Payload,
-		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
+		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout,
+		device=Device, hardware=Hardware}) ->
 	?LOG_DEBUG("~p rx sensor config update", [Device]),
-	flmqtt_sensor:config(Dispatcher, Device, Payload),
+	flmqtt_sensor:config(Dispatcher, Device, Hardware, Payload),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
 publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload,
 		Context=#ctx{device=Device}) ->

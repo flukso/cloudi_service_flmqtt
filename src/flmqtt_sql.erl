@@ -38,7 +38,7 @@
 -define(MYSQL_FLUKSO, "/db/mysql/flukso").
 
 -define(SQL_AUTH_DEVICE,
-	<<"SELECT sha
+	<<"SELECT sha, sensor
 	 FROM logger_devices
 	 WHERE device = ?">>).
 -define(SQL_AUTH_SENSOR,
@@ -57,12 +57,24 @@
 	<<"UPDATE logger_meters
 	 SET
 	 type = ?,
-	 subtype = ?,
 	 class = ?,
 	 function = ?,
 	 voltage = ?,
 	 current = ?,
 	 constant = ?,
+	 kid = ?,
+	 rid = ?,
+	 data_type = ?,
+	 enabled = ?,
+	 ports = ?,
+	 config = ?
+	 WHERE meter = ?">>).
+-define(SQL_SENSOR_CONFIG3,
+	<<"UPDATE logger_meters
+	 SET
+	 type = ?,
+	 subtype = ?,
+	 class = ?,
 	 kid = ?,
 	 rid = ?,
 	 data_type = ?,
@@ -125,6 +137,12 @@
 	 port,
 	 config)
 	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>).
+-define(SQL_SENSOR_COMPAT,
+	<<"UPDATE logger_meters
+	 SET
+	 function = ?
+	 WHERE device = ? AND ports = ? AND
+	 ((type = 'electricity' AND subtype = 'pplus') OR type = 'water' OR type = 'gas')">>).
 -define(SQL_TMPO_SINK,
 	<<"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
 	 VALUES (?, ?, ?, ?, ?, ?, ?)">>).
@@ -144,11 +162,13 @@
 	 {sensors, ?SQL_SENSORS},
 	 {sensors_active, ?SQL_SENSORS_ACTIVE},
 	 {sensor_config, ?SQL_SENSOR_CONFIG},
+	 {sensor_config3, ?SQL_SENSOR_CONFIG3},
 	 {kubes_clear, ?SQL_KUBES_CLEAR},
 	 {kube_update, ?SQL_KUBE_UPDATE},
 	 {kube_insert, ?SQL_KUBE_INSERT},
 	 {port_update, ?SQL_PORT_UPDATE},
 	 {port_insert, ?SQL_PORT_INSERT},
+	 {sensor_compat, ?SQL_SENSOR_COMPAT},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
 	 {tmpo_clean, ?SQL_TMPO_CLEAN},
 	 {tmpo_last, ?SQL_TMPO_LAST}]).
