@@ -100,22 +100,29 @@ update(Sid, {ok, _Fileinfo}, Gzdata) ->
 		proplists:get_value(h, Jdata)),
 	Tabs = rel_to_abs(tl(Trel), [Thead]),
 	Vabs = rel_to_abs(tl(Vrel), [Vhead]),
-	Data = [[integer_to_list(Time), ":", number_to_list(Value), " "]
-		|| {Time, Value} <- lists:zip(Tabs, Vabs)],
+	Data = [[integer_to_list(Time), ":", integer_to_list(Value), " "]
+		|| {Time, Value} <- purge(lists:zip(Tabs, Vabs))],
 	Return = erlrrd:update([path(base, Sid), " ", Data]),
 	?LOG_DEBUG("rrd:update Data: ~p Return: ~p", [Data, Return]);
 update(_Sid, {error, enoent}, _Gzdata) ->
 	{ok, no_rrd_found}.
 
-number_to_list(X) when is_integer(X) ->
-	integer_to_list(X);
-number_to_list(X) when is_float(X) ->
-	float_to_list(X, [{decimals, 0}]).
- 
 rel_to_abs([], Abs) ->
 	lists:reverse(Abs);
 rel_to_abs([Hrel | Trel], [Habs | Tabs]) ->
 	rel_to_abs(Trel, [Hrel + Habs | [Habs | Tabs]]).
+
+purge([]) ->
+	[];
+purge([{_Time, Value} | T]) ->
+	purge(T, [], trunc(Value)).
+ 
+purge([], Acc, _RefValue) ->
+	lists:reverse(Acc);
+purge([{Time, Value} | T], Acc, RefValue) when trunc(Value) =/= RefValue ->
+	purge(T, [{Time, trunc(Value)} | Acc], trunc(Value));
+purge([_H | T], Acc, RefValue) ->
+	purge(T, Acc, RefValue).
 
 path(base, Sid) ->
 	[?RRD_PATH_BASE, binary_to_list(Sid), ".rrd"];
