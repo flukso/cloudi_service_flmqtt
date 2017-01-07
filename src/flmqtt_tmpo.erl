@@ -35,7 +35,7 @@
 
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
--define(TMPO_MAX_BYTE_SIZE, 2097152). % 2MB
+-define(TMPO_MAX_BYTE_SIZE, 16777216). % 16MB
 -define(GZ_MAGIC_NUMBER, 8075). % 0x1f8b
 
 sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
