@@ -119,6 +119,7 @@
 	 name = ?,
 	 class = ?,
 	 current = ?,
+	 triggr = ?,
 	 constant = ?,
 	 dsmr = ?,
 	 enabled = ?,
@@ -129,6 +130,7 @@
 	 name,
 	 class,
 	 current,
+	 triggr,
 	 constant,
 	 dsmr,
 	 enabled,
@@ -136,7 +138,7 @@
 	 device,
 	 port,
 	 config)
-	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>).
+	 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)">>).
 -define(SQL_SENSOR_COMPAT,
 	<<"UPDATE logger_meters
 	 SET

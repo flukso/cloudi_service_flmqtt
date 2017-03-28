@@ -39,6 +39,7 @@
 	<<"name">>,
 	<<"class">>,
 	<<"current">>,
+	<<"trigger">>,
 	<<"constant">>,
 	<<"dsmr">>,
 	<<"enable">>
@@ -56,11 +57,11 @@ update(Dispatcher, Device, Port, Config) ->
 
 update(_Dispatcher, undefined, _Args) ->
 	{ok, section_ignored};
-update(Dispatcher, _Enable, [Name, _, _, _, _, _, _, Device, Port] = Args) ->
+update(Dispatcher, _Enable, [Name, _, _, _, _, _, _, _, Device, Port] = Args) ->
 	insert(Dispatcher, Args, flmqtt_sql:execute(Dispatcher, port_update, Args)),
 	update_sensor_compat(Dispatcher, Device, Port, Name).
 
-insert(Dispatcher, [_, _, _, _, _, _, Config, _, _] = Args, {updated, 0}) ->
+insert(Dispatcher, [_, _, _, _, _, _, _, Config, _, _] = Args, {updated, 0}) ->
 	{updated, 1} = flmqtt_sql:execute(Dispatcher, port_insert, Args ++ [Config]),
 	{ok, port_inserted};
 insert(_Dispatcher, _Args, {updated, 1}) ->
