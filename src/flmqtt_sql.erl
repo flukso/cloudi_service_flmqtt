@@ -145,6 +145,11 @@
 	 function = ?
 	 WHERE device = ? AND ports = ? AND
 	 ((type = 'electricity' AND subtype = 'pplus') OR type = 'water' OR type = 'gas')">>).
+-define(SQL_DEVICE_SINK_TAP,
+	<<"UPDATE logger_devices
+	 SET
+	 tap = ?
+	 WHERE device = ?">>).
 -define(SQL_TMPO_SINK,
 	<<"INSERT INTO tmpo (sensor, rid, lvl, bid, ext, created, data)
 	 VALUES (?, ?, ?, ?, ?, ?, ?)">>).
@@ -171,6 +176,7 @@
 	 {port_update, ?SQL_PORT_UPDATE},
 	 {port_insert, ?SQL_PORT_INSERT},
 	 {sensor_compat, ?SQL_SENSOR_COMPAT},
+	 {device_sink_tap, ?SQL_DEVICE_SINK_TAP},
 	 {tmpo_sink, ?SQL_TMPO_SINK},
 	 {tmpo_clean, ?SQL_TMPO_CLEAN},
 	 {tmpo_last, ?SQL_TMPO_LAST}]).

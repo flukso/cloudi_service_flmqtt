@@ -259,6 +259,11 @@ publish([<<>>, <<"device">>, Device, <<"config">>, <<"sensor">>], Payload,
 	?LOG_DEBUG("~p rx sensor config update", [Device]),
 	flmqtt_sensor:config(Dispatcher, Device, Hardware, Payload),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
+publish([<<>>, <<"device">>, Device, <<"test">>, <<"tap">>], Payload,
+	Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
+	?LOG_DEBUG("~p rx tap test report", [Device]),
+	flmqtt_device:sink_tap(Dispatcher, Device, Payload),
+	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
 publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload,
 		Context=#ctx{device=Device}) ->
 	?LOG_INFO("~p rx sync trigger from flm", [Device]),

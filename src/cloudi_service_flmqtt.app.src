@@ -9,6 +9,7 @@
         flmqtt_auth,
         flmqtt_sql,
         flmqtt_tmpo,
+        flmqtt_device,
         flmqtt_sensor,
         flmqtt_port,
         flmqtt_rrd,
