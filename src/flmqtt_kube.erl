@@ -60,7 +60,8 @@ update(Dispatcher, _HwId, Args) ->
 	insert(Dispatcher, Args, flmqtt_sql:execute(Dispatcher, kube_update, Args)).
 
 insert(Dispatcher, [_, _, _, _, _, _, Config, _] = Args, {updated, 0}) ->
-	{updated, 1} = flmqtt_sql:execute(Dispatcher, kube_insert, Args ++ [Config]),
+	% no update, so the kube entry might not yet exist
+	flmqtt_sql:execute(Dispatcher, kube_insert, Args ++ [Config]),
 	{ok, kube_inserted};
 insert(_Dispatcher, _Args, {updated, 1}) ->
 	{ok, kube_updated}.

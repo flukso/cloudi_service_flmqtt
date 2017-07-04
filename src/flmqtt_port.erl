@@ -62,7 +62,8 @@ update(Dispatcher, _Enable, [Name, _, _, _, _, _, _, _, Device, Port] = Args) ->
 	update_sensor_compat(Dispatcher, Device, Port, Name).
 
 insert(Dispatcher, [_, _, _, _, _, _, _, Config, _, _] = Args, {updated, 0}) ->
-	{updated, 1} = flmqtt_sql:execute(Dispatcher, port_insert, Args ++ [Config]),
+	% no update, so the port entry might not yet exist
+	flmqtt_sql:execute(Dispatcher, port_insert, Args ++ [Config]),
 	{ok, port_inserted};
 insert(_Dispatcher, _Args, {updated, 1}) ->
 	{ok, port_updated}.
