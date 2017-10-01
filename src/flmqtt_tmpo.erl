@@ -39,12 +39,17 @@
 -define(GZ_MAGIC_NUMBER, 8075). % 0x1f8b
 
 sink(Dispatcher, Sid, Rid, Lvl, Bid, Ext, Data) ->
-	ok = check(timestamp(), blocksize(Lvl), Bid, Ext, magic(Data), byte_size(Data)),
-	flmqtt_sql:execute(Dispatcher, tmpo_sink, 
-		[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
-	clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
-	?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
-	{ok, tmpo_file_sunk}.
+	case check(timestamp(), blocksize(Lvl), Bid, Ext, magic(Data), byte_size(Data)) of
+		{ok, _} ->
+			flmqtt_sql:execute(Dispatcher, tmpo_sink, 
+				[Sid, Rid, Lvl, Bid, Ext, timestamp(), Data]),
+			clean(Dispatcher, Sid, Rid, Lvl, Bid, Ext),
+			?LOG_INFO("~p tmpo block ~p/~p/~p sunk", [Sid, Rid, Lvl, Bid]),
+			{ok, tmpo_file_sunk};
+		{error, Error} ->
+			?LOG_ERROR("~p tmpo block ~p/~p/~p error: ~p", [Sid, Rid, Lvl, Bid, Error]),
+			{error, Error}
+	end.
 
 sync(Dispatcher, Device) ->
 	{selected, Active} = flmqtt_sql:execute(Dispatcher, sensors_active, [Device]),
@@ -79,7 +84,7 @@ check(_, _, _, Ext, _, _) when Ext /= <<"gz">> ->
 check(_, _, _, <<"gz">>, Magic, _) when Magic /= ?GZ_MAGIC_NUMBER ->
 	{error, no_gz_magic_in_payload};
 check(_, _, _, _, _, _) ->
-	ok.
+	{ok, valid_tmpo_block}.
 
 last_child(Lvl, Bid) ->
 	Bid + 15 * blocksize(Lvl - 4).
