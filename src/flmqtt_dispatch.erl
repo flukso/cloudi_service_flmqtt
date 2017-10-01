@@ -106,10 +106,9 @@ handle_message(Message=#mqtt_pingreq{}, Context) ->
 	Reply = #mqtt_pingresp{},
 	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Reply]),
 	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
-handle_message(Message=#mqtt_publish{topic=Topic, payload=Payload}, Context) ->
+handle_message(Message=#mqtt_publish{topic=Topic, payload=Payload, qos=QoS, message_id=Mid}, Context) ->
 	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
-	% TODO reply PUBACK for QoS1 messages
-	publish(re:split(Topic, "/"), Payload, Context);
+	publish(re:split(Topic, "/"), Payload, QoS, Mid, Context);
 handle_message(Message=#mqtt_puback{}, Context) ->
 	?LOG_DEBUG("~p MSG IN ~p", [Context#ctx.device, Message]),
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Context#ctx.timeout};
@@ -243,32 +242,32 @@ sync(Context=#ctx{device=Device, cloudi_dispatcher=Dispatcher}) ->
 		state = ?STATE_LIVE,
 		timestamp = os:timestamp()}, Context#ctx.timeout}.
 
-publish([<<>>, <<"device">>, Device, <<"config">>, <<"kube">>], Payload,
+publish([<<>>, <<"device">>, Device, <<"config">>, <<"kube">>], Payload, QoS, Mid,
 	Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
 	?LOG_DEBUG("~p rx kube config update", [Device]),
 	flmqtt_kube:config(Dispatcher, Device, Payload),
-	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
-publish([<<>>, <<"device">>, Device, <<"config">>, <<"flx">>], Payload,
+	publish_reply(QoS, Mid, Context, Timeout);
+publish([<<>>, <<"device">>, Device, <<"config">>, <<"flx">>], Payload, QoS, Mid,
 	Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
 	?LOG_DEBUG("~p rx flx/port config update", [Device]),
 	flmqtt_port:config(Dispatcher, Device, Payload),
-	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
-publish([<<>>, <<"device">>, Device, <<"config">>, <<"sensor">>], Payload,
+	publish_reply(QoS, Mid, Context, Timeout);
+publish([<<>>, <<"device">>, Device, <<"config">>, <<"sensor">>], Payload, QoS, Mid,
 		Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout,
 		device=Device, hardware=Hardware}) ->
 	?LOG_DEBUG("~p rx sensor config update", [Device]),
 	flmqtt_sensor:config(Dispatcher, Device, Hardware, Payload),
-	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
-publish([<<>>, <<"device">>, Device, <<"test">>, <<"tap">>], Payload,
+	publish_reply(QoS, Mid, Context, Timeout);
+publish([<<>>, <<"device">>, Device, <<"test">>, <<"tap">>], Payload, QoS, Mid,
 	Context=#ctx{cloudi_dispatcher=Dispatcher, timeout=Timeout, device=Device}) ->
 	?LOG_DEBUG("~p rx tap test report", [Device]),
 	flmqtt_device:sink_tap(Dispatcher, Device, Payload),
-	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
-publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload,
+	publish_reply(QoS, Mid, Context, Timeout);
+publish([<<>>, <<"device">>, Device, <<"tmpo">>, <<"sync">>], _Payload, _QoS, _Mid,
 		Context=#ctx{device=Device}) ->
 	?LOG_INFO("~p rx sync trigger from flm", [Device]),
 	sync(Context);
-publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload,
+publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload, QoS, Mid,
 		Context=#ctx{cloudi_dispatcher=Dispatcher,timeout=Timeout,
 		device=Device, hardware=Hardware}) ->
 	case flmqtt_auth:sensor(Dispatcher, Sid, Device) of
@@ -280,9 +279,16 @@ publish([<<>>, <<"sensor">>, Sid, <<"tmpo">>, Rid, Lvl, Bid, Ext], Payload,
 		_ ->
 			?LOG_WARN("~p rx invalid tmpo sid ~p", [Device, Sid])
 	end,
-	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout};
-publish(TopicList, _Payload, Context=#ctx{device=Device, timeout=Timeout}) ->
+	publish_reply(QoS, Mid, Context, Timeout);
+publish(TopicList, _Payload, QoS, Mid, Context=#ctx{device=Device, timeout=Timeout}) ->
 	?LOG_WARN("~p unrecognized flmqtt topic: ~p", [Device, TopicList]),
+	publish_reply(QoS, Mid, Context, Timeout).
+
+publish_reply(QoS, Mid, Context, Timeout) when QoS =:= at_least_once ->
+	Reply = flmqtt:puback([{message_id, Mid}]),
+	?LOG_DEBUG("~p MSG OUT ~p", [Context#ctx.device, Reply]),
+	{reply, Reply, Context#ctx{timestamp=os:timestamp()}, Timeout};
+publish_reply(_QoS, _Mid, Context, Timeout) ->
 	{noreply, Context#ctx{timestamp=os:timestamp()}, Timeout}.
 
 timeout(infinity, _) ->
