@@ -68,9 +68,13 @@ insert(Dispatcher, [_, _, _, _, _, _, _, Config, _, _] = Args, {updated, 0}) ->
 insert(_Dispatcher, _Args, {updated, 1}) ->
 	{ok, port_updated}.
 
+update_sensor_compat(_Dispatcher, _Device, _Port, undefined) ->
+	{ok, sensor_compat_undefined};
 update_sensor_compat(Dispatcher, Device, Port, Name) when Port < <<"7">> ->
 	Args = [Name, Device, list_to_binary(["[", Port, "]"])],
 	flmqtt_sql:execute(Dispatcher, sensor_compat, Args),
+	Args2 = [[Name, <<"-">>], Device, list_to_binary(["[", Port, "]"])],
+	flmqtt_sql:execute(Dispatcher, sensor_compat2, Args2),
 	{ok, sensor_compat_updated};
 update_sensor_compat(_Dispatcher, _Device, _Port, _Name) ->
 	{ok, sensor_compat_ignored}.

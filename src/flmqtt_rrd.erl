@@ -48,6 +48,7 @@
 ]).
 -define(RRD_CREATE_SUBTYPES, [
 	{<<"pplus">>, true},
+	{<<"pminus">>, true},
 	{undefined, true}
 ]).
 
