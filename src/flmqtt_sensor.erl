@@ -36,6 +36,7 @@
 -include_lib("cloudi_core/include/cloudi_logger.hrl").
 
 -define(FLM03E_HARDWARE, 35).
+-define(FLC01A_HARDWARE, 111).
 -define(PARAMS, [
 	<<"type">>,
 	<<"class">>,
@@ -51,13 +52,22 @@
 ]).
 -define(PARAMS3, [
 	<<"type">>,
-    <<"subtype">>,
+	<<"subtype">>,
 	<<"class">>,
 	<<"kid">>,
 	<<"rid">>,
 	<<"data_type">>,
 	<<"enable">>
 %	<<"port">>, % see port()
+]).
+-define(PARAMSC, [
+	<<"type">>,
+	<<"subtype">>,
+	<<"class">>,
+	<<"function">>,
+	<<"rid">>,
+	<<"data_type">>,
+	<<"enable">>
 ]).
 
 config(Dispatcher, Device, Hardware, Jconfig) ->
@@ -73,13 +83,15 @@ update(Dispatcher, Hardware, SidsDict, Config) ->
 	update(Dispatcher, Hardware, Sid, Config, orddict:is_key(Sid, SidsDict)).
 
 update(Dispatcher, Hardware, Sid, Config, true) when Hardware < ?FLM03E_HARDWARE ->
-    update1(Dispatcher, Sid, Config, ?PARAMS, sensor_config);
+	update_m(Dispatcher, Sid, Config, ?PARAMS, sensor_config);
+update(Dispatcher, Hardware, Sid, Config, true) when Hardware < ?FLC01A_HARDWARE ->
+	update_m(Dispatcher, Sid, Config, ?PARAMS3, sensor_config3);
 update(Dispatcher, _Hardware, Sid, Config, true) ->
-	update1(Dispatcher, Sid, Config, ?PARAMS3, sensor_config3);
+	update_c(Dispatcher, Sid, Config, ?PARAMSC, sensor_configc);
 update(_Dispatcher, _Hardware, _Sid, _Config, false) ->
 	{error, sensor_not_found}.
 
-update1(Dispatcher, Sid, Config, Params, Query) ->
+update_m(Dispatcher, Sid, Config, Params, Query) ->
 	Args = [proplists:get_value(Key, Config) || Key <- Params],
 	Port = to_json(proplists:get_value(<<"port">>, Config)),
 	Args1 = Args ++ [Port, timestamp(), Sid],
@@ -87,6 +99,13 @@ update1(Dispatcher, Sid, Config, Params, Query) ->
 	{updated, _Count} = flmqtt_sql:execute(Dispatcher, Query, Args1),
 	flmqtt_rrd:create(Sid, proplists:get_value(<<"type">>, Config),
 		proplists:get_value(<<"subtype">>, Config)),
+	{ok, sensor_updated}.
+
+update_c(Dispatcher, Sid, Config, Params, Query) ->
+	Args = [proplists:get_value(Key, Config) || Key <- Params],
+	Args1 = Args ++ [timestamp(), Sid],
+	?LOG_DEBUG("~p sensor config with args: ~p", [Sid, Args1]),
+	{updated, _Count} = flmqtt_sql:execute(Dispatcher, Query, Args1),
 	{ok, sensor_updated}.
 
 to_json(undefined) ->

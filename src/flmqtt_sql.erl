@@ -82,6 +82,18 @@
 	 ports = ?,
 	 config = ?
 	 WHERE meter = ?">>).
+-define(SQL_SENSOR_CONFIGC,
+	<<"UPDATE logger_meters
+	 SET
+	 type = ?,
+	 subtype = ?,
+	 class = ?,
+	 function = ?,
+	 rid = ?,
+	 data_type = ?,
+	 enabled = ?,
+	 config = ?
+	 WHERE meter = ?">>).
 -define(SQL_KUBES_CLEAR,
 	<<"UPDATE kube
 	 SET
@@ -176,6 +188,7 @@
 	 {sensors_active, ?SQL_SENSORS_ACTIVE},
 	 {sensor_config, ?SQL_SENSOR_CONFIG},
 	 {sensor_config3, ?SQL_SENSOR_CONFIG3},
+	 {sensor_configc, ?SQL_SENSOR_CONFIGC},
 	 {kubes_clear, ?SQL_KUBES_CLEAR},
 	 {kube_update, ?SQL_KUBE_UPDATE},
 	 {kube_insert, ?SQL_KUBE_INSERT},
